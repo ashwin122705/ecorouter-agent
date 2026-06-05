@@ -21,19 +21,36 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
+import os
+
 from agents.ecorouter import _route_jobs, _use_mock_llm  # noqa: E402
+from reports.esg_report import generate_esg_pdf  # noqa: E402
 from sim_environment.baseline_scheduler import (  # noqa: E402
     run_round_robin_scheduler,
     run_static_default_scheduler,
 )
-from sim_environment.carbon_metrics import compare_schedulers, total_carbon_cost  # noqa: E402
-from sim_environment.grid_data import REGIONS, fluctuate_grid_status, get_live_grid_status  # noqa: E402
+from sim_environment.carbon_metrics import (  # noqa: E402
+    compare_schedulers,
+    total_carbon_cost,
+    total_energy_cost_usd,
+)
+from sim_environment.grid_data import (  # noqa: E402
+    REGIONS,
+    fluctuate_grid_status,
+    get_grid_telemetry,
+)
 from sim_environment.grid_forecast import (  # noqa: E402
     forecast_grid,
     forecast_to_dataframe,
     recommend_deferral_window,
 )
-from sim_environment.job_queue import generate_mock_jobs  # noqa: E402
+from sim_environment.job_queue import (  # noqa: E402
+    generate_mock_jobs,
+    parse_jobs_from_csv,
+    parse_jobs_from_json,
+    sample_jobs_json,
+)
+from sim_environment.sla import hours_until_deadline  # noqa: E402
 
 load_dotenv(ROOT / ".env")
 
@@ -99,9 +116,26 @@ def _intensity_color(value: int, max_val: int) -> str:
     return "#ef4444"
 
 
+def _load_grid(source: str | None = None, fluctuate: bool = False) -> dict[str, Any]:
+    src = source or st.session_state.get("grid_source", "simulated")
+    if fluctuate and st.session_state.get("grid_status"):
+        carbon = fluctuate_grid_status(st.session_state.grid_status)
+        telemetry = dict(st.session_state.grid_telemetry)
+        telemetry["carbon_gco2_per_kwh"] = carbon
+        telemetry["greenest_region"] = min(carbon, key=carbon.get)
+        telemetry["greenest_intensity"] = carbon[telemetry["greenest_region"]]
+        telemetry["source"] = "simulated_shift"
+        return telemetry
+    return get_grid_telemetry(source=src)
+
+
 def _init_session() -> None:
+    telemetry = get_grid_telemetry(source="simulated")
     defaults: dict[str, Any] = {
-        "grid_status": get_live_grid_status(),
+        "grid_telemetry": telemetry,
+        "grid_status": telemetry["carbon_gco2_per_kwh"],
+        "tariffs": telemetry["cost_usd_per_kwh"],
+        "grid_source": "simulated",
         "jobs": generate_mock_jobs(num_jobs=4),
         "assignments": None,
         "baseline_assignments": None,
@@ -117,18 +151,20 @@ def _init_session() -> None:
         "deferral": None,
         "run_history": [],
         "rr_index": 0,
+        "custom_jobs_loaded": False,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = val
 
 
-def _refresh_telemetry(fluctuate: bool = False) -> None:
-    if fluctuate and st.session_state.grid_status:
-        st.session_state.grid_status = fluctuate_grid_status(st.session_state.grid_status)
-    else:
-        st.session_state.grid_status = get_live_grid_status()
-    st.session_state.jobs = generate_mock_jobs(num_jobs=st.session_state.num_jobs)
+def _refresh_telemetry(fluctuate: bool = False, reload_jobs: bool = True) -> None:
+    telemetry = _load_grid(fluctuate=fluctuate)
+    st.session_state.grid_telemetry = telemetry
+    st.session_state.grid_status = telemetry["carbon_gco2_per_kwh"]
+    st.session_state.tariffs = telemetry["cost_usd_per_kwh"]
+    if reload_jobs and not st.session_state.custom_jobs_loaded:
+        st.session_state.jobs = generate_mock_jobs(num_jobs=st.session_state.num_jobs)
     st.session_state.assignments = None
     st.session_state.baseline_assignments = None
     st.session_state.comparison = None
@@ -172,9 +208,11 @@ def _run_optimization(include_baseline: bool = True) -> None:
             jobs, grid, assignments, baseline,
             eco_name=st.session_state.router or "EcoRouter",
             baseline_name=baseline_name,
+            tariffs=st.session_state.tariffs,
         )
 
     eco_carbon = total_carbon_cost(jobs, grid, assignments)
+    eco_cost = total_energy_cost_usd(jobs, st.session_state.tariffs, assignments)
     baseline_carbon = (
         st.session_state.comparison["baseline_total_gco2"]
         if st.session_state.comparison
@@ -187,8 +225,10 @@ def _run_optimization(include_baseline: bool = True) -> None:
             "router": st.session_state.router,
             "jobs": len(jobs),
             "eco_gco2": eco_carbon,
+            "eco_cost_usd": eco_cost,
             "baseline_gco2": baseline_carbon,
             "saved_gco2": (baseline_carbon - eco_carbon) if baseline_carbon else None,
+            "grid_source": st.session_state.grid_telemetry.get("source", "simulated"),
         },
     )
     st.session_state.run_history = st.session_state.run_history[:20]
@@ -248,6 +288,11 @@ def _build_dispatch_table(
                 "Routed To": region,
                 "Hours": job["compute_hours"],
                 "Est. Carbon (gCO₂)": grid[region] * job["compute_hours"],
+                "Est. Cost ($)": round(
+                    st.session_state.tariffs.get(region, 0.10) * job["compute_hours"], 2
+                ),
+                "Deadline (UTC)": job.get("deadline_utc", "—"),
+                "SLA": "PASS" if a.get("sla_met", True) else "FAIL",
                 "Status": _assignment_status(job, a, greenest),
                 "Reasoning": a.get("reasoning", ""),
             }
@@ -319,15 +364,33 @@ with st.sidebar:
         ["static", "round_robin"],
         format_func=lambda x: "Static default (us-east-1)" if x == "static" else "Round-robin",
     )
+    new_source = st.selectbox(
+        "Grid data source",
+        ["simulated", "live"],
+        index=0 if st.session_state.grid_source == "simulated" else 1,
+        help="Live uses Electricity Maps API when ELECTRICITY_MAPS_API_KEY is set",
+    )
+    if new_source != st.session_state.grid_source:
+        st.session_state.grid_source = new_source
+        telemetry = get_grid_telemetry(source=new_source)
+        st.session_state.grid_telemetry = telemetry
+        st.session_state.grid_status = telemetry["carbon_gco2_per_kwh"]
+        st.session_state.tariffs = telemetry["cost_usd_per_kwh"]
+        _update_forecast()
+        st.rerun()
     if st.button("🔄 Refresh Grid & Queue", use_container_width=True):
-        _refresh_telemetry(fluctuate=False)
+        st.session_state.custom_jobs_loaded = False
+        _refresh_telemetry(fluctuate=False, reload_jobs=True)
         st.rerun()
     if st.button("📡 Simulate Grid Shift", use_container_width=True):
-        _refresh_telemetry(fluctuate=True)
+        _refresh_telemetry(fluctuate=True, reload_jobs=False)
         st.rerun()
     st.markdown("---")
     engine = "Mock" if _use_mock_llm() else "Gemini 2.5 Flash"
+    live_key = bool(os.getenv("ELECTRICITY_MAPS_API_KEY", "").strip())
     st.caption(f"**LLM available:** {engine}")
+    st.caption(f"**Electricity Maps:** {'configured' if live_key else 'not set (simulated fallback)'}")
+    st.caption(f"**Grid source:** {st.session_state.grid_telemetry.get('source', 'simulated')}")
     st.caption(f"**Updated:** {_utc_now()}")
 
 # --- Hero ---
@@ -338,25 +401,36 @@ st.markdown(
     <span class="ecorouter-pill">LLM Tool Calling</span>
     <span class="ecorouter-pill">Grid Forecasting</span>
     <span class="ecorouter-pill">A/B Carbon Analysis</span>
-    <span class="ecorouter-pill">REST API</span></div>""",
+    <span class="ecorouter-pill">REST API</span>
+    <span class="ecorouter-pill">FinOps $/kWh</span>
+    <span class="ecorouter-pill">SLA Deadlines</span>
+    <span class="ecorouter-pill">ESG Export</span></div>""",
     unsafe_allow_html=True,
 )
 
 grid = st.session_state.grid_status
+tariffs = st.session_state.tariffs
 jobs = st.session_state.jobs
 greenest = min(grid, key=grid.get)
 
-tab_dash, tab_forecast, tab_ab, tab_tools = st.tabs(
-    ["📊 Live Dashboard", "📈 Forecast & Deferral", "⚖️ A/B Comparison", "🔧 Tools & API"]
+tab_dash, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.tabs(
+    [
+        "📊 Live Dashboard",
+        "📈 Forecast & Deferral",
+        "⚖️ A/B Comparison",
+        "🏢 Enterprise",
+        "🔧 Tools & API",
+    ]
 )
 
 # ===================== TAB 1: DASHBOARD =====================
 with tab_dash:
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("Greenest Region", greenest)
     m2.metric("Intensity", f"{grid[greenest]} gCO₂/kWh")
-    m3.metric("Pending Jobs", len(jobs))
-    m4.metric("Avg Network", f"{sum(grid.values()) / len(grid):.0f} gCO₂/kWh")
+    m3.metric("Tariff", f"${tariffs[greenest]:.3f}/kWh")
+    m4.metric("Pending Jobs", len(jobs))
+    m5.metric("Data Source", st.session_state.grid_telemetry.get("source", "simulated"))
 
     c1, c2 = st.columns([1.1, 0.9])
     with c1:
@@ -370,10 +444,19 @@ with tab_dash:
     df_jobs = pd.DataFrame(jobs).copy()
     df_jobs["locality_constraint"] = df_jobs["locality_constraint"].fillna("—")
     df_jobs["is_urgent"] = df_jobs["is_urgent"].map({True: "Urgent", False: "Flexible"})
+    df_jobs["hours_to_deadline"] = df_jobs.apply(
+        lambda r: (
+            f"{hours_until_deadline(r.to_dict()):.1f}h"
+            if hours_until_deadline(r.to_dict()) is not None
+            else "—"
+        ),
+        axis=1,
+    )
     st.dataframe(
         df_jobs.rename(columns={
             "job_id": "Job ID", "task": "Workload", "compute_hours": "Hours",
             "is_urgent": "Priority", "locality_constraint": "Locality",
+            "deadline_utc": "Deadline (UTC)", "hours_to_deadline": "Time to SLA",
         }),
         use_container_width=True,
         hide_index=True,
@@ -387,15 +470,27 @@ with tab_dash:
     if st.session_state.optimized and st.session_state.assignments:
         st.markdown("### ✅ Dispatch Summary")
         comp = st.session_state.comparison
-        r1, r2, r3, r4 = st.columns(4)
+        r1, r2, r3, r4, r5 = st.columns(5)
         r1.metric("Jobs Routed", len(st.session_state.assignments))
         eco_total = comp["eco_total_gco2"] if comp else total_carbon_cost(
             jobs, grid, st.session_state.assignments
         )
+        eco_cost_total = comp["eco_total_cost_usd"] if comp else total_energy_cost_usd(
+            jobs, tariffs, st.session_state.assignments
+        )
         r2.metric("EcoRouter Carbon", f"{eco_total:,} gCO₂")
+        r3.metric("EcoRouter Cost", f"${eco_cost_total:.2f}")
         if comp:
-            r3.metric("Carbon Saved vs Baseline", f"{comp['carbon_saved_gco2']:,} gCO₂", f"{comp['savings_pct']}%")
-            r4.metric("Baseline Carbon", f"{comp['baseline_total_gco2']:,} gCO₂")
+            r4.metric(
+                "Carbon Saved",
+                f"{comp['carbon_saved_gco2']:,} gCO₂",
+                f"{comp['savings_pct']}%",
+            )
+            r5.metric(
+                "Cost Saved",
+                f"${comp['cost_saved_usd']:.2f}",
+                f"{comp['cost_savings_pct']}%",
+            )
         st.caption(f"Engine: **{st.session_state.router}**")
 
         dispatch_df = _build_dispatch_table(
@@ -458,20 +553,35 @@ with tab_ab:
         st.info("Run **EcoRouter Optimization** on the Live Dashboard tab to generate comparison data.")
     else:
         comp = st.session_state.comparison
-        a1, a2, a3 = st.columns(3)
-        a1.metric("EcoRouter Total", f"{comp['eco_total_gco2']:,} gCO₂")
-        a2.metric(f"{comp['baseline_name']} Total", f"{comp['baseline_total_gco2']:,} gCO₂")
+        a1, a2, a3, a4 = st.columns(4)
+        a1.metric("EcoRouter Carbon", f"{comp['eco_total_gco2']:,} gCO₂")
+        a2.metric("Baseline Carbon", f"{comp['baseline_total_gco2']:,} gCO₂")
         a3.metric(
-            "Savings",
+            "Carbon Saved",
             f"{comp['carbon_saved_gco2']:,} gCO₂",
-            f"{comp['savings_pct']}% reduction",
+            f"{comp['savings_pct']}%",
+        )
+        a4.metric(
+            "Cost Saved",
+            f"${comp['cost_saved_usd']:.2f}",
+            f"{comp['cost_savings_pct']}%",
         )
 
-        chart_df = pd.DataFrame({
-            comp["eco_name"]: [comp["eco_total_gco2"]],
-            comp["baseline_name"]: [comp["baseline_total_gco2"]],
-        })
-        st.bar_chart(chart_df, color=["#22c55e", "#ef4444"], height=280)
+        c1, c2 = st.columns(2)
+        with c1:
+            chart_df = pd.DataFrame({
+                comp["eco_name"]: [comp["eco_total_gco2"]],
+                comp["baseline_name"]: [comp["baseline_total_gco2"]],
+            })
+            st.markdown("**Carbon (gCO₂)**")
+            st.bar_chart(chart_df, color=["#22c55e", "#ef4444"], height=240)
+        with c2:
+            cost_df = pd.DataFrame({
+                comp["eco_name"]: [comp["eco_total_cost_usd"]],
+                comp["baseline_name"]: [comp["baseline_total_cost_usd"]],
+            })
+            st.markdown("**Energy cost (USD)**")
+            st.bar_chart(cost_df, color=["#22c55e", "#ef4444"], height=240)
 
         merged = pd.DataFrame(comp["eco_per_job"]).merge(
             pd.DataFrame(comp["baseline_per_job"]),
@@ -494,15 +604,87 @@ with tab_ab:
             hide_index=True,
         )
 
-        if comp["savings_pct"] > 0:
+        if comp["savings_pct"] > 0 or comp["cost_savings_pct"] > 0:
             st.success(
-                f"EcoRouter avoided **{comp['carbon_saved_gco2']:,} gCO₂** "
-                f"({comp['savings_pct']}%) vs {comp['baseline_name']} on this batch."
+                f"EcoRouter saved **{comp['carbon_saved_gco2']:,} gCO₂** ({comp['savings_pct']}%) "
+                f"and **${comp['cost_saved_usd']:.2f}** ({comp['cost_savings_pct']}%) "
+                f"vs {comp['baseline_name']}."
             )
         else:
             st.warning("Baseline matched EcoRouter — likely all jobs had locality constraints.")
 
-# ===================== TAB 4: TOOLS & API =====================
+# ===================== TAB 4: ENTERPRISE =====================
+with tab_enterprise:
+    st.markdown("<p class='section-title'>🏢 Enterprise — BYO Jobs, SLA & ESG Reporting</p>", unsafe_allow_html=True)
+    st.caption("Upload your workload queue, enforce SLA deadlines, and export Scope 2 reports for compliance.")
+
+    up1, up2 = st.columns(2)
+    with up1:
+        st.markdown("#### Upload job queue (JSON)")
+        json_upload = st.file_uploader("JSON file", type=["json"], key="json_jobs")
+        json_text = st.text_area("Or paste JSON", value=sample_jobs_json(), height=180, key="json_paste")
+        if st.button("Load JSON jobs", use_container_width=True):
+            try:
+                text = json_upload.getvalue().decode() if json_upload else json_text
+                st.session_state.jobs = parse_jobs_from_json(text)
+                st.session_state.custom_jobs_loaded = True
+                st.session_state.assignments = None
+                st.session_state.comparison = None
+                st.session_state.optimized = False
+                st.success(f"Loaded {len(st.session_state.jobs)} job(s).")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Invalid JSON: {exc}")
+
+    with up2:
+        st.markdown("#### Upload job queue (CSV)")
+        st.caption("Columns: job_id, task, compute_hours, is_urgent, locality_constraint, deadline_utc")
+        csv_upload = st.file_uploader("CSV file", type=["csv"], key="csv_jobs")
+        if st.button("Load CSV jobs", use_container_width=True, disabled=csv_upload is None):
+            try:
+                st.session_state.jobs = parse_jobs_from_csv(csv_upload.getvalue().decode())
+                st.session_state.custom_jobs_loaded = True
+                st.session_state.assignments = None
+                st.session_state.comparison = None
+                st.session_state.optimized = False
+                st.success(f"Loaded {len(st.session_state.jobs)} job(s).")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Invalid CSV: {exc}")
+
+    st.markdown("#### Regional tariffs (USD/kWh)")
+    tariff_df = pd.DataFrame([
+        {"Region": r, "USD/kWh": tariffs[r], "Carbon (gCO₂/kWh)": grid[r]}
+        for r in REGIONS
+    ])
+    st.dataframe(tariff_df, use_container_width=True, hide_index=True)
+
+    st.markdown("#### ESG / Scope 2 PDF export")
+    if st.session_state.optimized and st.session_state.assignments:
+        pdf_bytes = generate_esg_pdf(
+            jobs=jobs,
+            grid_status=grid,
+            assignments=st.session_state.assignments,
+            comparison=st.session_state.comparison,
+            grid_source=st.session_state.grid_telemetry.get("source", "simulated"),
+            router=st.session_state.router or "EcoRouter",
+            tariffs=tariffs,
+        )
+        st.download_button(
+            "⬇️ Download ESG Report (PDF)",
+            data=pdf_bytes,
+            file_name=f"ecorouter_esg_{datetime.now(timezone.utc).strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+        st.caption("Share with sustainability / compliance teams for Scope 2 workload reporting.")
+    else:
+        st.info("Run **EcoRouter Optimization** first to generate the ESG report.")
+
+    if st.session_state.custom_jobs_loaded:
+        st.success("Using **custom uploaded** job queue (refresh grid will not replace jobs).")
+
+# ===================== TAB 5: TOOLS & API =====================
 with tab_tools:
     st.markdown("<p class='section-title'>🔧 Tools, Export & REST API</p>", unsafe_allow_html=True)
 
@@ -546,11 +728,19 @@ with tab_tools:
         )
         st.markdown("""
 **Endpoints:**
-- `GET /api/v1/grid` — live telemetry
-- `GET /api/v1/forecast?hours=12` — carbon forecast + deferral advice
+- `GET /api/v1/grid?source=live` — carbon + $/kWh tariffs
+- `GET /api/v1/forecast?hours=12&source=simulated` — forecast + deferral
 - `POST /api/v1/optimize?num_jobs=4&mode=forecast` — run optimizer
-- `GET /api/v1/compare?baseline=static` — A/B carbon analysis
+- `POST /api/v1/jobs` — BYO job queue (JSON body)
+- `GET /api/v1/compare?baseline=static` — A/B carbon + cost analysis
         """)
+        st.markdown("**BYO jobs example:**")
+        st.code(
+            """curl -X POST http://localhost:8000/api/v1/jobs \\
+  -H "Content-Type: application/json" \\
+  -d '{"jobs":[{"job_id":"t1","task":"train_llama3_8b","compute_hours":12,"deadline_utc":"2026-06-10T18:00:00Z"}],"mode":"forecast"}'""",
+            language="bash",
+        )
 
     st.markdown("#### Run history (this session)")
     if st.session_state.run_history:

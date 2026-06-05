@@ -1,26 +1,129 @@
+"""Job queue: mock generation, BYO import (JSON/CSV), SLA deadlines."""
+
+from __future__ import annotations
+
+import json
 import uuid
 import random
+from datetime import datetime, timedelta, timezone
+from io import StringIO
+from typing import Any
 
-def generate_mock_jobs(num_jobs=5):
-    """
-    Generates a queue of mock AI compute workloads to be routed by the agent.
-    """
-    job_types = ["train_llama3_8b", "batch_image_processing", "whisper_transcription", "data_pipeline"]
-    
-    jobs = []
-    for _ in range(num_jobs):
-        job = {
-            "job_id": f"job_{str(uuid.uuid4())[:8]}",
-            "task": random.choice(job_types),
-            "compute_hours": random.randint(1, 24),
-            # If False, the agent can use temporal shifting (delay the job for greener energy)
-            "is_urgent": random.choice([True, False]), 
-            # Simulates data privacy laws (e.g., GDPR requiring EU processing)
-            "locality_constraint": random.choice([None, "eu-central-1", "us-east-1", None]) 
-        }
-        jobs.append(job)
+import pandas as pd
+
+from sim_environment.grid_data import REGIONS
+
+JOB_TYPES = [
+    "train_llama3_8b",
+    "batch_image_processing",
+    "whisper_transcription",
+    "data_pipeline",
+    "llm_fine_tune",
+    "embedding_batch",
+]
+
+
+def _default_deadline(hours_from_now: int | None = None) -> str:
+    hrs = hours_from_now if hours_from_now is not None else random.randint(4, 72)
+    return (datetime.now(timezone.utc) + timedelta(hours=hrs)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def normalize_job(raw: dict[str, Any], index: int = 0) -> dict[str, Any]:
+    """Validate and normalize a single job record from any import source."""
+    job_id = str(raw.get("job_id") or f"job_{str(uuid.uuid4())[:8]}")
+    task = str(raw.get("task") or raw.get("workload") or JOB_TYPES[index % len(JOB_TYPES)])
+
+    compute_hours = raw.get("compute_hours") or raw.get("hours") or raw.get("gpu_hours") or 8
+    compute_hours = max(1, int(compute_hours))
+
+    is_urgent = raw.get("is_urgent")
+    if is_urgent is None:
+        is_urgent = str(raw.get("priority", "")).lower() in {"urgent", "high", "critical"}
+    else:
+        is_urgent = bool(is_urgent)
+
+    locality = raw.get("locality_constraint") or raw.get("locality") or raw.get("region_lock")
+    if locality in ("", "—", "-", "none", "null"):
+        locality = None
+    if locality and locality not in REGIONS:
+        raise ValueError(f"Job {job_id}: invalid locality {locality!r}. Must be one of {REGIONS}")
+
+    deadline = raw.get("deadline_utc") or raw.get("deadline") or _default_deadline(
+        6 if is_urgent else random.randint(12, 96)
+    )
+
+    return {
+        "job_id": job_id,
+        "task": task,
+        "compute_hours": compute_hours,
+        "is_urgent": is_urgent,
+        "locality_constraint": locality,
+        "deadline_utc": str(deadline),
+    }
+
+
+def generate_mock_jobs(num_jobs: int = 5) -> list[dict[str, Any]]:
+    """Generate mock AI compute workloads with SLA deadlines."""
+    jobs: list[dict[str, Any]] = []
+    for i in range(num_jobs):
+        is_urgent = random.choice([True, False])
+        jobs.append(
+            normalize_job(
+                {
+                    "task": random.choice(JOB_TYPES),
+                    "compute_hours": random.randint(1, 24),
+                    "is_urgent": is_urgent,
+                    "locality_constraint": random.choice([None, "eu-central-1", "us-east-1", None]),
+                    "deadline_utc": _default_deadline(6 if is_urgent else random.randint(24, 96)),
+                },
+                index=i,
+            )
+        )
     return jobs
 
-if __name__ == "__main__":
-    import json
-    print(json.dumps(generate_mock_jobs(2), indent=2))
+
+def parse_jobs_from_json(text: str) -> list[dict[str, Any]]:
+    """Parse BYO jobs from JSON array or `{ \"jobs\": [...] }` payload."""
+    data = json.loads(text)
+    if isinstance(data, dict):
+        data = data.get("jobs", data.get("queue", []))
+    if not isinstance(data, list):
+        raise ValueError("JSON must be an array of jobs or an object with a 'jobs' key.")
+    return [normalize_job(item, index=i) for i, item in enumerate(data)]
+
+
+def parse_jobs_from_csv(text: str) -> list[dict[str, Any]]:
+    """Parse BYO jobs from CSV with flexible column names."""
+    df = pd.read_csv(StringIO(text))
+    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+    jobs: list[dict[str, Any]] = []
+    for i, row in df.iterrows():
+        jobs.append(normalize_job(row.to_dict(), index=i))
+    return jobs
+
+
+def sample_jobs_json() -> str:
+    """Example JSON payload for API docs and UI."""
+    return json.dumps(
+        {
+            "jobs": [
+                {
+                    "job_id": "train_001",
+                    "task": "train_llama3_8b",
+                    "compute_hours": 18,
+                    "is_urgent": False,
+                    "locality_constraint": None,
+                    "deadline_utc": _default_deadline(48),
+                },
+                {
+                    "job_id": "infer_002",
+                    "task": "batch_image_processing",
+                    "compute_hours": 6,
+                    "is_urgent": True,
+                    "locality_constraint": "eu-central-1",
+                    "deadline_utc": _default_deadline(8),
+                },
+            ]
+        },
+        indent=2,
+    )

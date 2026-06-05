@@ -1,10 +1,10 @@
-"""Carbon accounting and scheduler comparison metrics."""
+"""Carbon and electricity cost accounting."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from sim_environment.grid_data import REGIONS
+from sim_environment.grid_data import REGIONS, REGION_TARIFFS_USD
 
 
 def job_carbon_cost(
@@ -12,8 +12,16 @@ def job_carbon_cost(
     grid_status: dict[str, int],
     target_region: str,
 ) -> int:
-    """Estimated gCO₂ for a job: intensity × compute_hours."""
     return grid_status.get(target_region, 0) * job.get("compute_hours", 0)
+
+
+def job_energy_cost_usd(
+    job: dict[str, Any],
+    tariffs: dict[str, float],
+    target_region: str,
+) -> float:
+    rate = tariffs.get(target_region, REGION_TARIFFS_USD.get(target_region, 0.10))
+    return round(rate * job.get("compute_hours", 0), 2)
 
 
 def total_carbon_cost(
@@ -29,12 +37,30 @@ def total_carbon_cost(
     )
 
 
+def total_energy_cost_usd(
+    jobs: list[dict[str, Any]],
+    tariffs: dict[str, float],
+    assignments: list[dict[str, Any]],
+) -> float:
+    by_job = {a["job_id"]: a["target_region"] for a in assignments}
+    return round(
+        sum(
+            job_energy_cost_usd(job, tariffs, by_job[job["job_id"]])
+            for job in jobs
+            if job["job_id"] in by_job
+        ),
+        2,
+    )
+
+
 def per_job_breakdown(
     jobs: list[dict[str, Any]],
     grid_status: dict[str, int],
     assignments: list[dict[str, Any]],
     scheduler_name: str,
+    tariffs: dict[str, float] | None = None,
 ) -> list[dict[str, Any]]:
+    tariffs = tariffs or REGION_TARIFFS_USD
     by_job = {a["job_id"]: a for a in assignments}
     rows: list[dict[str, Any]] = []
     for job in jobs:
@@ -42,7 +68,6 @@ def per_job_breakdown(
         if not a:
             continue
         region = a["target_region"]
-        carbon = job_carbon_cost(job, grid_status, region)
         rows.append(
             {
                 "job_id": job["job_id"],
@@ -50,9 +75,13 @@ def per_job_breakdown(
                 "scheduler": scheduler_name,
                 "target_region": region,
                 "compute_hours": job["compute_hours"],
-                "carbon_gco2": carbon,
+                "carbon_gco2": job_carbon_cost(job, grid_status, region),
+                "cost_usd": job_energy_cost_usd(job, tariffs, region),
                 "is_urgent": job.get("is_urgent"),
                 "locality_constraint": job.get("locality_constraint"),
+                "deadline_utc": job.get("deadline_utc"),
+                "sla_met": a.get("sla_met", True),
+                "deferred": a.get("deferred", False),
             }
         )
     return rows
@@ -65,19 +94,30 @@ def compare_schedulers(
     baseline_assignments: list[dict[str, Any]],
     eco_name: str = "EcoRouter",
     baseline_name: str = "Baseline",
+    tariffs: dict[str, float] | None = None,
 ) -> dict[str, Any]:
+    tariffs = tariffs or REGION_TARIFFS_USD
     eco_total = total_carbon_cost(jobs, grid_status, eco_assignments)
     baseline_total = total_carbon_cost(jobs, grid_status, baseline_assignments)
-    saved = baseline_total - eco_total
-    pct = (saved / baseline_total * 100) if baseline_total > 0 else 0.0
+    carbon_saved = baseline_total - eco_total
+    carbon_pct = (carbon_saved / baseline_total * 100) if baseline_total > 0 else 0.0
+
+    eco_cost = total_energy_cost_usd(jobs, tariffs, eco_assignments)
+    baseline_cost = total_energy_cost_usd(jobs, tariffs, baseline_assignments)
+    cost_saved = round(baseline_cost - eco_cost, 2)
+    cost_pct = (cost_saved / baseline_cost * 100) if baseline_cost > 0 else 0.0
 
     return {
         "eco_name": eco_name,
         "baseline_name": baseline_name,
         "eco_total_gco2": eco_total,
         "baseline_total_gco2": baseline_total,
-        "carbon_saved_gco2": saved,
-        "savings_pct": round(pct, 1),
-        "eco_per_job": per_job_breakdown(jobs, grid_status, eco_assignments, eco_name),
-        "baseline_per_job": per_job_breakdown(jobs, grid_status, baseline_assignments, baseline_name),
+        "carbon_saved_gco2": carbon_saved,
+        "savings_pct": round(carbon_pct, 1),
+        "eco_total_cost_usd": eco_cost,
+        "baseline_total_cost_usd": baseline_cost,
+        "cost_saved_usd": cost_saved,
+        "cost_savings_pct": round(cost_pct, 1),
+        "eco_per_job": per_job_breakdown(jobs, grid_status, eco_assignments, eco_name, tariffs),
+        "baseline_per_job": per_job_breakdown(jobs, grid_status, baseline_assignments, baseline_name, tariffs),
     }

@@ -13,9 +13,10 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
-from sim_environment.grid_data import REGIONS, get_live_grid_status
+from sim_environment.grid_data import REGIONS, get_grid_telemetry, get_live_grid_status
 from sim_environment.grid_forecast import forecast_grid, recommend_deferral_window
 from sim_environment.job_queue import generate_mock_jobs
+from sim_environment.sla import apply_sla_to_assignments, can_defer
 
 load_dotenv()
 
@@ -25,7 +26,8 @@ Your goals:
 1. Minimize carbon emissions (gCO₂eq/kWh) by routing each job to an appropriate data center region.
 2. Respect hard constraints: if a job has a locality_constraint, the target_region MUST be exactly that region.
 3. If is_urgent is true, pick the best allowed region now (no temporal deferral in this simulation).
-4. If is_urgent is false and there is no locality constraint, you may still pick the lowest-carbon allowed region now; temporal shifting is not modeled as a separate tool—optimize for current grid telemetry.
+4. Respect SLA deadlines (deadline_utc): never defer a job if waiting would cause it to miss its deadline.
+5. If is_urgent is false and there is no locality constraint, you may still pick the lowest-carbon allowed region now; temporal shifting is not modeled as a separate tool—optimize for current grid telemetry.
 
 Always call get_grid_carbon_intensity at least once before assigning workloads, so decisions are grounded in telemetry.
 For every job in the queue, call assign_workload exactly once with a valid target_region from the tool schema.
@@ -257,14 +259,23 @@ def run_forecast_aware_router(
             deferred = False
             defer_hours = 0
         elif deferral["should_defer"]:
-            target = deferral["recommended_region"]
             defer_hours = deferral["recommended_hours_ahead"]
-            reasoning = (
-                f"Flexible job deferred {defer_hours}h per forecast: {target} expected at "
-                f"{deferral['recommended_intensity']} gCO₂/kWh "
-                f"(~{deferral['estimated_savings_pct']}% vs dispatching now)."
-            )
-            deferred = True
+            if can_defer(job, defer_hours):
+                target = deferral["recommended_region"]
+                reasoning = (
+                    f"Flexible job deferred {defer_hours}h per forecast: {target} expected at "
+                    f"{deferral['recommended_intensity']} gCO₂/kWh "
+                    f"(~{deferral['estimated_savings_pct']}% vs dispatching now)."
+                )
+                deferred = True
+            else:
+                target = greenest_now
+                reasoning = (
+                    f"Flexible job — deferral skipped (SLA deadline {job.get('deadline_utc')}); "
+                    f"routing now to {greenest_now} ({grid_status[greenest_now]} gCO₂/kWh)."
+                )
+                deferred = False
+                defer_hours = 0
         else:
             target = greenest_now
             reasoning = (
@@ -439,19 +450,24 @@ def _route_jobs(
     """
     if mode == "forecast" or use_forecast:
         assignments, meta = run_forecast_aware_router(jobs, grid_status)
+        assignments = apply_sla_to_assignments(jobs, assignments)
         return assignments, meta
 
     if mode == "mock" or (mode == "auto" and _use_mock_llm()):
-        return run_mock_router(jobs, grid_status), {"router": "mock", "model": None}
+        assignments = apply_sla_to_assignments(jobs, run_mock_router(jobs, grid_status))
+        return assignments, {"router": "mock", "model": None}
 
     if mode == "gemini" or mode == "auto":
         try:
             meta = run_gemini_router(jobs, grid_status)
+            meta["assignments"] = apply_sla_to_assignments(jobs, meta["assignments"])
             return meta["assignments"], meta
         except genai_errors.ClientError:
-            return run_mock_router(jobs, grid_status), {"router": "mock (api fallback)", "model": None}
+            assignments = apply_sla_to_assignments(jobs, run_mock_router(jobs, grid_status))
+            return assignments, {"router": "mock (api fallback)", "model": None}
 
-    return run_mock_router(jobs, grid_status), {"router": "mock", "model": None}
+    assignments = apply_sla_to_assignments(jobs, run_mock_router(jobs, grid_status))
+    return assignments, {"router": "mock", "model": None}
 
 
 def run_execution_loop(num_jobs: int = 5) -> dict[str, Any]:
