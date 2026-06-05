@@ -399,11 +399,6 @@ def _run_optimization(include_baseline: bool = True) -> None:
     jobs = st.session_state.jobs
     grid = st.session_state.grid_status
     mode = st.session_state.routing_mode
-    if (
-        st.session_state.use_forecast
-        and mode not in ("cost_aware", "pareto", "load_balanced", "forecast")
-    ):
-        mode = "forecast"
 
     with contextlib.redirect_stdout(io.StringIO()):
         assignments, meta = _route_jobs(
@@ -672,8 +667,10 @@ with st.sidebar:
     st.session_state.use_forecast = st.toggle(
         "Forecast-aware scheduling",
         value=st.session_state.use_forecast,
-        help="Defer flexible jobs to greener forecast windows (carbon-first modes only)",
-        disabled=st.session_state.routing_mode in ("cost_aware", "pareto", "load_balanced"),
+        help=(
+            "When enabled, flexible jobs may defer to greener 12h forecast windows "
+            "on top of the selected routing engine (Pareto, cost-aware, etc.)."
+        ),
     )
     st.session_state.baseline_type = st.radio(
         "A/B baseline",

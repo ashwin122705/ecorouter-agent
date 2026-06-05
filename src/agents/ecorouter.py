@@ -311,6 +311,57 @@ def run_forecast_aware_router(
     return assignments, {"router": "forecast-aware", "forecast": forecast, "deferral": deferral}
 
 
+def apply_forecast_overlay(
+    jobs: list[dict[str, Any]],
+    assignments: list[dict[str, Any]],
+    grid_status: dict[str, int],
+    min_deferral_savings_pct: float = 12.0,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Apply forecast deferral to flexible, non-locality jobs on top of any router."""
+    forecast = forecast_grid(grid_status, hours_ahead=12)
+    deferral = recommend_deferral_window(
+        grid_status, forecast, min_deferral_savings_pct
+    )
+    if not deferral.get("should_defer"):
+        return assignments, {"forecast": forecast, "deferral": deferral}
+
+    defer_hours = deferral["recommended_hours_ahead"]
+    by_id = {a["job_id"]: dict(a) for a in assignments}
+
+    for job in jobs:
+        if job.get("locality_constraint") or job.get("is_urgent"):
+            continue
+        if not can_defer(job, defer_hours):
+            continue
+        entry = by_id[job["job_id"]]
+        entry["target_region"] = deferral["recommended_region"]
+        entry["deferred"] = True
+        entry["defer_hours"] = defer_hours
+        prior = entry.get("reasoning", "")
+        entry["reasoning"] = (
+            f"{prior} | Forecast deferral {defer_hours}h → "
+            f"{deferral['recommended_region']} "
+            f"(~{deferral['estimated_savings_pct']}% greener vs dispatch now)."
+        )
+
+    return list(by_id.values()), {"forecast": forecast, "deferral": deferral}
+
+
+def _with_forecast_overlay(
+    jobs: list[dict[str, Any]],
+    assignments: list[dict[str, Any]],
+    grid_status: dict[str, int],
+    meta: dict[str, Any],
+    use_forecast: bool,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if not use_forecast:
+        return assignments, meta
+    updated, forecast_meta = apply_forecast_overlay(jobs, assignments, grid_status)
+    meta = {**meta, **forecast_meta}
+    meta["router"] = f"{meta.get('router', 'router')} + forecast"
+    return updated, meta
+
+
 def run_cost_aware_router(
     jobs: list[dict[str, Any]],
     grid_status: dict[str, int],
@@ -599,44 +650,66 @@ def _route_jobs(
                 jobs, grid_status, tariffs, carbon_weight=carbon_weight
             ),
         )
-        return assignments, {"router": "load-balanced", "model": None}
+        return _with_forecast_overlay(
+            jobs, assignments, grid_status,
+            {"router": "load-balanced", "model": None},
+            use_forecast,
+        )
 
     if mode == "cost_aware":
         assignments = apply_sla_to_assignments(
             jobs, run_cost_aware_router(jobs, grid_status, tariffs, carbon_weight)
         )
-        return assignments, {
-            "router": "cost-aware",
-            "carbon_weight": carbon_weight,
-            "model": None,
-        }
+        return _with_forecast_overlay(
+            jobs, assignments, grid_status,
+            {"router": "cost-aware", "carbon_weight": carbon_weight, "model": None},
+            use_forecast,
+        )
 
     if mode == "pareto":
         assignments = apply_sla_to_assignments(
             jobs, run_pareto_router(jobs, grid_status, tariffs)
         )
-        return assignments, {"router": "pareto", "model": None}
+        return _with_forecast_overlay(
+            jobs, assignments, grid_status,
+            {"router": "pareto", "model": None},
+            use_forecast,
+        )
 
-    if mode == "forecast" or use_forecast:
+    if mode == "forecast":
         assignments, meta = run_forecast_aware_router(jobs, grid_status)
         assignments = apply_sla_to_assignments(jobs, assignments)
         return assignments, meta
 
     if mode == "mock" or (mode == "auto" and _use_mock_llm()):
         assignments = apply_sla_to_assignments(jobs, run_mock_router(jobs, grid_status))
-        return assignments, {"router": "carbon-first (mock)", "model": None}
+        return _with_forecast_overlay(
+            jobs, assignments, grid_status,
+            {"router": "carbon-first (mock)", "model": None},
+            use_forecast,
+        )
 
     if mode == "gemini" or mode == "auto":
         try:
             meta = run_gemini_router(jobs, grid_status)
             meta["assignments"] = apply_sla_to_assignments(jobs, meta["assignments"])
-            return meta["assignments"], meta
+            return _with_forecast_overlay(
+                jobs, meta["assignments"], grid_status, meta, use_forecast
+            )
         except genai_errors.ClientError:
             assignments = apply_sla_to_assignments(jobs, run_mock_router(jobs, grid_status))
-            return assignments, {"router": "mock (api fallback)", "model": None}
+            return _with_forecast_overlay(
+                jobs, assignments, grid_status,
+                {"router": "mock (api fallback)", "model": None},
+                use_forecast,
+            )
 
     assignments = apply_sla_to_assignments(jobs, run_mock_router(jobs, grid_status))
-    return assignments, {"router": "mock", "model": None}
+    return _with_forecast_overlay(
+        jobs, assignments, grid_status,
+        {"router": "mock", "model": None},
+        use_forecast,
+    )
 
 
 def run_execution_loop(num_jobs: int = 5) -> dict[str, Any]:
