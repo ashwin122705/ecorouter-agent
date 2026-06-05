@@ -3,6 +3,8 @@
 * **Author:** Ashwin
 * **Track:** Automation / Agent Systems
 * **GitHub Repository:** https://github.com/ashwin122705/ecorouter-agent
+* **For TAs / Graders:** See [docs/TA_Access_Guide.md](docs/TA_Access_Guide.md) — run locally or deploy to Streamlit Cloud for a public interactive URL.
+* **Demo video script (≤6 min):** [docs/EcoRouter_Teleprompter_v2_Script.md](docs/EcoRouter_Teleprompter_v2_Script.md) · [HTML/PDF version](docs/EcoRouter_Teleprompter_v2.html)
 
 ---
 
