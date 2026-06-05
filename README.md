@@ -8,7 +8,7 @@
 | **Track** | Automation / Agent Systems |
 | **Repository** | https://github.com/ashwin122705/ecorouter-agent |
 | **Live demo** | Deploy via [Streamlit Cloud](https://share.streamlit.io) — see [TA Access Guide](docs/TA_Access_Guide.md) |
-| **Video script (≤6 min)** | [Teleprompter v2](docs/EcoRouter_Teleprompter_v2_Script.md) · [HTML/PDF](docs/EcoRouter_Teleprompter_v2.html) |
+| **Video script (≤6 min)** | [PDF teleprompter](docs/EcoRouter_Teleprompter_v2.pdf) · [Script](docs/EcoRouter_Teleprompter_v2_Script.md) · [HTML](docs/EcoRouter_Teleprompter_v2.html) |
 
 EcoRouter is an autonomous **carbon-aware AI workload orchestration agent**. It reads live (or simulated) grid telemetry across **30 AWS regions**, routes enterprise AI jobs to greener datacenters, respects SLA deadlines and compliance locality locks, and quantifies savings versus naive baselines — all through an interactive dashboard, REST API, and LLM tool-calling brain.
 

@@ -165,4 +165,6 @@ Thank you for watching.
 
 **Fallback:** `ECOROUTER_USE_MOCK=1` in `.env` — identical demo, no Gemini quota needed.
 
-**Print to PDF:** Open `docs/EcoRouter_Teleprompter_v2.html` → Cmd+P → Save as PDF.
+**PDF for recording:** [EcoRouter_Teleprompter_v2.pdf](EcoRouter_Teleprompter_v2.pdf) (or open `EcoRouter_Teleprompter_v2.html` → Cmd+P → Save as PDF).
+
+**Regenerate PDF:** `./scripts/generate_teleprompter_pdf.sh`
