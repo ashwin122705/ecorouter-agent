@@ -1,106 +1,227 @@
 # EcoRouter Agent 🌿
-**The One-Person Frontier Lab | Stanford CS 153: Large Language Model Agents**
-* **Author:** Ashwin
-* **Track:** Automation / Agent Systems
-* **GitHub Repository:** https://github.com/ashwin122705/ecorouter-agent
-* **For TAs / Graders:** See [docs/TA_Access_Guide.md](docs/TA_Access_Guide.md) — run locally or deploy to Streamlit Cloud for a public interactive URL.
-* **Demo video script (≤6 min):** [docs/EcoRouter_Teleprompter_v2_Script.md](docs/EcoRouter_Teleprompter_v2_Script.md) · [HTML/PDF version](docs/EcoRouter_Teleprompter_v2.html)
+
+**The One-Person Frontier Lab · Stanford CS 153: Large Language Model Agents**
+
+| | |
+|---|---|
+| **Author** | Ashwin |
+| **Track** | Automation / Agent Systems |
+| **Repository** | https://github.com/ashwin122705/ecorouter-agent |
+| **Live demo** | Deploy via [Streamlit Cloud](https://share.streamlit.io) — see [TA Access Guide](docs/TA_Access_Guide.md) |
+| **Video script (≤6 min)** | [Teleprompter v2](docs/EcoRouter_Teleprompter_v2_Script.md) · [HTML/PDF](docs/EcoRouter_Teleprompter_v2.html) |
+
+EcoRouter is an autonomous **carbon-aware AI workload orchestration agent**. It reads live (or simulated) grid telemetry across **30 AWS regions**, routes enterprise AI jobs to greener datacenters, respects SLA deadlines and compliance locality locks, and quantifies savings versus naive baselines — all through an interactive dashboard, REST API, and LLM tool-calling brain.
 
 ---
 
-## 🎯 1. Problem & Insight (3 / 3 Points)
+## What It Does Today
 
-### The Problem
-Data centers and intensive AI model training (like training Llama 3) consume catastrophic amounts of electricity. Because global energy grids fluctuate hourly based on solar, wind, and hydro availability, running massive batch compute jobs continuously results in an unnecessarily high carbon footprint (gCO₂/kWh).
+### Dashboard (6 tabs)
 
-### The Insight & Approach
-Infrastructure engineers shouldn't have to manually monitor green energy availability. **EcoRouter** is an autonomous, carbon-aware orchestration agent that acts as an intelligent traffic controller for compute workloads. It dynamically hooks into live global energy grid telemetry and uses structured LLM reasoning to distribute incoming compute jobs to regions with the absolute lowest carbon intensity—all while respecting rigid operational dependencies like urgent deadlines and data locality constraints.
+| Tab | Capabilities |
+|-----|----------------|
+| **Live Dashboard** | Scrollable 30-region carbon chart, realistic job queue, one-click optimization, dispatch summary with **gCO₂** totals, color-coded baseline → EcoRouter assignment table, regional load distribution |
+| **Region Optimizer** | Full region score matrix, global carbon scatter map, what-if job analyzer |
+| **Forecast & Deferral** | 12-hour per-region carbon forecast, deferral recommendations, forecast-aware routing toggle |
+| **A/B Comparison** | EcoRouter vs static `us-east-1` or round-robin baseline — carbon **and** cost savings with tradeoff messaging |
+| **Enterprise** | Bring-your-own jobs (JSON/CSV), ESG PDF report export |
+| **Tools & API** | Region/tariff exports, curl examples, deployment notes |
+
+### Routing engines
+
+| Mode | Description |
+|------|-------------|
+| **Pareto** (default) | Lower carbon without raising $/kWh vs baseline; spreads jobs across qualifying green regions |
+| **Cost-aware** | Tunable carbon vs energy cost weight (sidebar slider) |
+| **Load-balanced** | Spread workloads across green regions to avoid hotspotting |
+| **Forecast** | Defer flexible jobs to greener 12h windows |
+| **Gemini / Auto** | LLM tool-calling via `gemini-2.5-flash` (`get_grid_carbon_intensity`, `assign_workload`) |
+| **Mock** | Deterministic carbon-first heuristic — no API key required |
+
+Forecast-aware scheduling can be **layered on top** of Pareto, cost-aware, or load-balanced modes.
+
+### Personalization (sidebar)
+
+- **Your name** — personalized hero header
+- **Home region** — pick your AWS metro (e.g. `us-west-2 (Oregon)`)
+- **Job region policy** — realistic scenario mix, any region (carbon-flexible), lock to home region, or lock to a specific region
+- **Jobs per batch** — slider **or** typed number (2–40)
+- Simulated vs live grid (Electricity Maps when `ELECTRICITY_MAPS_API_KEY` is set)
+
+### Job scenarios (realistic enterprise workloads)
+
+- Fine-tune Llama 3, RAG embedding batches, Whisper transcription
+- GDPR EU inference (`eu-west-1`), US low-latency API (`us-east-1`), HIPAA US (`us-east-2`)
+- APAC finance jobs (`ap-southeast-1`), flexible research training — with urgent/flexible priority and SLA deadlines
 
 ---
 
-## 🛠️ 2. Execution & Technical Work (5 / 5 Points)
+## Quick Start
 
-EcoRouter is a completely functional, end-to-end Python simulation infrastructure featuring an AI core, simulated grid environments, and an interactive frontend dashboard built using Streamlit.
-
-### System Architecture
-1. **Agent Orchestrator (src/agents/ecorouter.py):** Utilizes the modern Google GenAI SDK (`google-genai`) powered by `gemini-2.5-flash` to evaluate complex scheduling rules via tool-calling.
-2. **Telemetry Layer (src/sim_environment/grid_data.py):** Simulates live carbon intensity telemetry across four global regions (us-east-1, us-west-2, eu-central-1, ap-south-1).
-3. **Workload Queue (src/sim_environment/job_queue.py):** Manages inbound jobs with explicit parameters: compute hours, urgency (Urgent vs Flexible), and locality constraints.
-4. **Interactive Dashboard (app.py):** A Streamlit web application that visually maps real-time grid metrics, tracks job queues, and allows users to trigger live optimization cycles.
-
-### Reproducibility & Local Setup
-To run the application locally, execute the following commands in your terminal:
+### Streamlit dashboard (recommended)
 
 ```bash
-# 1. Install required packages
-pip3 install google-genai streamlit pydantic
+git clone https://github.com/ashwin122705/ecorouter-agent.git
+cd ecorouter-agent
+pip install -r requirements.txt
 
-# 2. Add your API credentials to a local .env file
-echo "GEMINI_API_KEY=your_actual_api_key_here" > .env
+# Optional — mock routing works without any key (best for demos/TAs)
+echo "ECOROUTER_USE_MOCK=1" >> .env
 
-# 3. Spin up the Streamlit interface
+# Optional — enable Gemini LLM routing
+echo "GEMINI_API_KEY=your_key_here" >> .env
+
 streamlit run app.py
 ```
 
----
+Open http://localhost:8501 → **Refresh Grid & Queue** → **Run EcoRouter Optimization**.
 
-## 📊 3. Evaluation & Evidence (3 / 3 Points)
+### REST API
 
-### Verified Execution Log (Milestone Proof)
-The agent logic succeeds perfectly in balancing carbon optimization against strict programmatic boundary constraints:
-
-```
-========================================================================
-ECOROUTER — FINAL DISPATCH SUMMARY
-========================================================================
-Router: gemini (models/gemini-2.5-flash)
-Greenest region this cycle: eu-central-1 (164 gCO₂/kWh)
-
---- Grid Telemetry (gCO₂/kWh) ---
-  us-east-1        364
-  us-west-2        219
-  eu-central-1     164  ← greenest
-  ap-south-1       570
-
---- Job Assignments ---
-  [job_74ea09d5] batch_image_processing        →  us-east-1       (flexible, locality=us-east-1, 16h)
-       Carbon cost: ~5,824 gCO₂  |  Locality constraint strictly preserved over greenest region.
-  [job_65dc88da] batch_image_processing        →  eu-central-1    (flexible, locality=none, 8h)
-       Carbon cost: ~1,312 gCO₂  |  Successfully routed to lowest carbon intensity.
-  [job_f0d840fc] train_llama3_8b               →  eu-central-1    (urgent, locality=none, 19h)
-       Carbon cost: ~3,116 gCO₂  |  Urgent job prioritized to greenest immediate region.
-  [job_2226b08c] train_llama3_8b               →  eu-central-1    (flexible, locality=eu-central-1, 24h)
-       Carbon cost: ~3,936 gCO₂  |  Locality constraint correctly matched.
-  [job_a7661aba] batch_image_processing        →  eu-central-1    (urgent, locality=none, 23h)
-       Carbon cost: ~3,772 gCO₂  |  Urgent job optimized.
-
-Estimated total carbon cost: ~17,960 gCO₂ (intensity × compute_hours)
-========================================================================
+```bash
+pip install -r requirements.txt
+uvicorn api.server:app --reload --app-dir src --port 8000
 ```
 
-### Failure Analysis & Technical Iteration
-* **Iteration 1 (The Deprecated SDK Crash):** Initial implementation using `google-generativeai` suffered immediate runtime breaks due to package deprecations. The backend was rewritten entirely to support the standardized `google-genai` client pattern.
-* **Iteration 2 (Rate Limit Fallbacks):** High frequency testing on Google AI Studio's free tier hit strict constraints of 15 requests/min. The agent architecture was dynamically decoupled, rendering it ready to adopt multi-provider systems like OpenRouter or Groq (`llama3-70b-8192`) via identical tool-calling mappings to guarantee high-throughput availability.
+Interactive docs: http://localhost:8000/docs
+
+```bash
+# Grid telemetry
+curl http://localhost:8000/api/v1/grid
+
+# Optimize a batch (Pareto, 6 jobs)
+curl -X POST "http://localhost:8000/api/v1/optimize?num_jobs=6&mode=pareto"
+
+# A/B vs static baseline
+curl "http://localhost:8000/api/v1/compare?num_jobs=6&mode=pareto&baseline=static"
+```
+
+### CLI agent loop
+
+```bash
+ECOROUTER_USE_MOCK=1 python -m agents.ecorouter
+```
 
 ---
 
-## 🚀 4. Use Cases & Future Enhancements (2 / 2 Points)
+## System Architecture
 
-### Real-World Value
-EcoRouter provides immediate industrial value to cloud providers and decentralized physical infrastructure networks (DePIN). By delaying non-urgent workloads (e.g., offline video encoding or background checkpoint updates) or shifting them across geographic boundaries, tech companies can drastically drop their Scope 2 emissions profiles and operational carbon tax obligations.
+```
+ecorouter-agent/
+├── app.py                      # Streamlit dashboard (main entry)
+├── theme_css.py                # Dark-theme UI styles
+├── requirements.txt
+├── .streamlit/config.toml      # Streamlit Cloud theme
+├── docs/                       # Teleprompter, TA guide
+└── src/
+    ├── agents/ecorouter.py     # LLM tool-calling + all routing engines
+    ├── api/server.py           # FastAPI REST layer
+    ├── sim_environment/
+    │   ├── grid_data.py        # 30 AWS regions, carbon + tariffs
+    │   ├── job_queue.py        # Realistic job scenarios + BYO import
+    │   ├── grid_forecast.py    # 12h carbon forecast + deferral
+    │   ├── routing_scores.py   # Pareto, cost-aware, load-spread scoring
+    │   ├── carbon_metrics.py   # A/B comparison + tradeoff classification
+    │   ├── baseline_scheduler.py
+    │   └── region_analytics.py # Matrix, what-if, load distribution
+    └── reports/esg_report.py   # ESG PDF export
+```
 
-### Future Implementation Roadmap
-1. **Predictive Grid Forecasting:** Integrating time-series models to predict solar/wind degradation 6 to 12 hours out, enabling the agent to schedule ahead rather than routing solely on real-time data.
-2. **Wrangler / Cloudflare Edge Deployment:** Migrating the local Streamlit environment into a globally distributed edge service using Cloudflare Workers to access allocated platform credits for live production use.
+### Four layers
+
+1. **Grid simulator** — 30 AWS commercial regions with gCO₂/kWh, $/kWh tariffs, geographic metadata; optional [Electricity Maps](https://www.electricitymaps.com/) live data
+2. **Job queue** — Enterprise AI workloads with `compute_hours`, `is_urgent`, `locality_constraint`, `deadline_utc`
+3. **Agent brain** — Gemini 2.5 Flash tool-calling + Pareto / cost-aware / load-balanced / forecast routers with mock fallback
+4. **Dashboard + API** — Streamlit UI, FastAPI endpoints, ESG PDF export
 
 ---
 
-## 📝 5. Process, Integrity & Disclosure (2 / 2 Points)
+## Environment Variables
 
-### AI Usage Disclosure
-In total alignment with the CS 153 AI Policy, AI tools were leveraged transparently as an accelerator to scale this project as a one-person team:
-* **Gemini (AI Assistant):** Used as an architectural sounding board to resolve broken local Python dependencies, debug Git configuration states (`user.name` / `user.email`), and sketch clean data routing paradigms.
-* **Cursor AI:** Leveraged to accelerate boilerplates, construct the `app.py` Streamlit layout, and smoothly transition codebases away from deprecated Legacy Google SDK formats into the modern tool-calling framework.
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `GEMINI_API_KEY` | No | Gemini LLM routing (falls back to mock if unset) |
+| `ECOROUTER_USE_MOCK=1` | No | Force mock/Pareto routing — **recommended for TAs and video recording** |
+| `ELECTRICITY_MAPS_API_KEY` | No | Live grid carbon data (simulated fallback) |
 
-### Base Code & Citations
-All simulation logic, grid telemetry mechanics, and interface architectures were designed and implemented specifically for this project submission. No existing agent repositories were forked or borrowed.
+**Streamlit Cloud secrets** (Settings → Secrets):
+
+```toml
+ECOROUTER_USE_MOCK = "1"
+# GEMINI_API_KEY = "optional"
+```
+
+---
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Health check |
+| `GET` | `/api/v1/regions` | Region catalog (30 AWS metros) |
+| `GET` | `/api/v1/regions/matrix` | Carbon/cost/Pareto score matrix |
+| `GET` | `/api/v1/grid` | Live grid telemetry |
+| `GET` | `/api/v1/forecast` | 12h carbon forecast |
+| `POST` | `/api/v1/optimize` | Route a mock job batch |
+| `POST` | `/api/v1/jobs` | Route custom BYO jobs (JSON body) |
+| `GET` | `/api/v1/compare` | EcoRouter vs baseline comparison |
+| `POST` | `/api/v1/analyze` | What-if single job analysis |
+
+---
+
+## For TAs & Graders
+
+See **[docs/TA_Access_Guide.md](docs/TA_Access_Guide.md)** for:
+
+- Streamlit Cloud one-click deploy (public interactive URL)
+- Local run instructions (no API key needed)
+- Suggested 3-minute grading walkthrough
+- Troubleshooting
+
+**Minimum grading path:** Live Dashboard → Run Optimization → A/B Comparison tab → verify gCO₂ savings.
+
+---
+
+## CS 153 Rubric Alignment
+
+### 1. Problem & Insight (3 pts)
+
+**Problem:** AI training and inference consume catastrophic electricity; grid carbon intensity varies by region and hour.
+
+**Insight:** Replace manual DevOps/FinOps scheduling with an autonomous agent that routes workloads to the lowest-carbon region allowed by SLA and compliance constraints.
+
+### 2. Execution & Technical Work (5 pts)
+
+End-to-end Python system: simulated grid (30 regions), realistic job queue, Gemini tool-calling agent, Pareto/cost-aware/forecast routing, Streamlit dashboard, FastAPI, ESG export. Reproducible via `requirements.txt`, CLI, and API.
+
+### 3. Evaluation & Evidence (3 pts)
+
+- **Constraint satisfaction:** Locality-locked jobs never leave required region; urgent jobs respect deadlines
+- **Quantified A/B savings:** Grams CO₂ and USD saved vs static `us-east-1` or round-robin (often 50–90%+ on flexible batches)
+- **Iteration log:** SDK migration (`google-generativeai` → `google-genai`), rate-limit mock fallback, 4 → 30 regions, Pareto load-spreading
+
+### 4. Use Cases & Future (2 pts)
+
+**Today:** Cloud providers, AI labs, FinOps teams, DePIN networks — reduce Scope 2 emissions without breaking SLAs.
+
+**Future:** Kubernetes operator, per-tenant carbon budgets, reinforcement learning over multi-day forecasts.
+
+### 5. Process & Disclosure (2 pts)
+
+**AI tools used (CS 153 policy):** Cursor AI and Gemini for boilerplate, debugging, SDK migration, and UI iteration. All simulation logic, routing algorithms, and architecture are original to this project.
+
+---
+
+## Deployment Notes
+
+| Platform | What it hosts |
+|----------|----------------|
+| **[Streamlit Cloud](https://share.streamlit.io)** | ✅ Full interactive dashboard (`app.py`) — **use this for TAs** |
+| **Local** | ✅ Dashboard + API + CLI |
+| **Cloudflare Workers** (`wrangler deploy`) | Static landing page only (`public/`) — not the Streamlit app |
+
+---
+
+## License & Attribution
+
+Built for Stanford CS 153 Spring 2026. All core simulation and routing logic written for this submission.
