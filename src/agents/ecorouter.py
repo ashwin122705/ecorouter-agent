@@ -359,6 +359,21 @@ def print_execution_summary(
     print("=" * 72 + "\n")
 
 
+def _route_jobs(
+    jobs: list[dict[str, Any]],
+    grid_status: dict[str, int],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Route a batch via Gemini or mock heuristic; returns assignments and metadata."""
+    if _use_mock_llm():
+        return run_mock_router(jobs, grid_status), {"router": "mock", "model": None}
+
+    try:
+        meta = run_gemini_router(jobs, grid_status)
+        return meta["assignments"], meta
+    except genai_errors.ClientError:
+        return run_mock_router(jobs, grid_status), {"router": "mock (api fallback)", "model": None}
+
+
 def run_execution_loop(num_jobs: int = 5) -> dict[str, Any]:
     """
     Main EcoRouter execution loop:
