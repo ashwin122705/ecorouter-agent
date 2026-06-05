@@ -176,11 +176,36 @@ def build_theme_css(theme: str) -> str:
         background: {t["scroll_thumb"]}; border-radius: 8px;
         border: 2px solid {t["border"]};
       }}
-      .carbon-chart-inner {{
-        display: flex; align-items: flex-end; gap: 10px; padding-bottom: 4px;
+      .carbon-chart-plot {{
+        display: flex;
+        flex-direction: column;
       }}
-      .carbon-bar-col {{
-        display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
+      .carbon-bars-row {{
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+      }}
+      .carbon-baseline {{
+        height: 2px;
+        background: {t["border"]};
+        margin: 0 0 8px 0;
+        border-radius: 999px;
+      }}
+      .carbon-labels-row {{
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }}
+      .carbon-bar-slot, .carbon-label-slot {{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex-shrink: 0;
+      }}
+      .carbon-badge-slot {{
+        min-height: 18px;
+        margin-top: 3px;
+        text-align: center;
       }}
       .carbon-bar-value {{
         font-size: 0.82rem; font-weight: 700; color: {t["text"]} !important; margin-bottom: 6px;
@@ -197,7 +222,7 @@ def build_theme_css(theme: str) -> str:
         border: 1px solid rgba(0,0,0,0.12);
       }}
       .carbon-bar-region {{
-        font-size: 0.72rem; font-weight: 700; color: {t["text"]} !important; margin-top: 8px;
+        font-size: 0.72rem; font-weight: 700; color: {t["text"]} !important; margin-top: 0;
         text-align: center; line-height: 1.2; word-break: break-all;
       }}
       .carbon-bar-label {{ font-size: 0.65rem; color: {t["text_muted"]} !important; text-align: center; margin-top: 2px; }}

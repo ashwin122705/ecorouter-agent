@@ -153,28 +153,37 @@ def _render_scrollable_carbon_chart(
     bar_width: int = 56,
     chart_height: int = 180,
 ) -> None:
-    """Horizontal-scroll bar chart — resize bars via sidebar controls."""
+    """Horizontal-scroll bar chart with a shared baseline for every bar."""
     greenest = min(grid, key=grid.get)
     max_val = max(grid.values()) or 1
     min_val = min(grid.values()) or 0
-    cols: list[str] = []
+    bar_slots: list[str] = []
+    label_slots: list[str] = []
 
     for region in REGIONS:
         value = grid[region]
         h_pct = max(6, int((value / max_val) * 100))
         color = _intensity_color(value, max_val, min_val)
         geo = REGION_GEO.get(region, {})
-        badge = '<span class="bar-badge-green">GREENEST</span>' if region == greenest else ""
-        cols.append(
-            f'<div class="carbon-bar-col" style="width:{bar_width}px">'
+        badge = (
+            '<span class="bar-badge-green">GREENEST</span>'
+            if region == greenest
+            else "&nbsp;"
+        )
+        bar_slots.append(
+            f'<div class="carbon-bar-slot" style="width:{bar_width}px">'
             f'<div class="carbon-bar-value">{value:,}</div>'
             f'<div class="carbon-bar-wrap" style="height:{chart_height}px">'
             f'<div class="carbon-bar-fill" style="height:{h_pct}%;background:{color}"></div>'
-            f"</div>"
+            f"</div></div>"
+        )
+        label_slots.append(
+            f'<div class="carbon-label-slot" style="width:{bar_width}px">'
             f'<div class="carbon-bar-region">{region}</div>'
             f'<div class="carbon-bar-label">{geo.get("label", "")}</div>'
             f'<div class="carbon-bar-tariff">${tariffs.get(region, 0):.3f}/kWh</div>'
-            f"{badge}</div>"
+            f'<div class="carbon-badge-slot">{badge}</div>'
+            f"</div>"
         )
 
     inner_w = len(REGIONS) * (bar_width + 10) + 20
@@ -182,8 +191,11 @@ def _render_scrollable_carbon_chart(
         f'<div class="carbon-scroll-hint">↔ Scroll horizontally — {len(REGIONS)} regions · '
         f'drag bar width in sidebar to enlarge</div>'
         f'<div class="carbon-chart-scroll">'
-        f'<div class="carbon-chart-inner" style="min-width:{inner_w}px">{"".join(cols)}</div>'
-        f"</div>"
+        f'<div class="carbon-chart-plot" style="min-width:{inner_w}px">'
+        f'<div class="carbon-bars-row">{"".join(bar_slots)}</div>'
+        f'<div class="carbon-baseline"></div>'
+        f'<div class="carbon-labels-row">{"".join(label_slots)}</div>'
+        f"</div></div>"
         f'<div class="carbon-legend">Carbon intensity scale'
         f'<div class="gradient-legend-bar"></div>'
         f'<div class="gradient-legend-labels">'
@@ -806,6 +818,7 @@ with tab_dash:
                 ),
             ])
         _render_stat_cards(summary_cards)
+        if comp:
             tradeoff = comp.get("tradeoff_type", "")
             if tradeoff == "win_win":
                 st.success(comp.get("tradeoff_message", ""))
@@ -853,7 +866,7 @@ with tab_dash:
                 use_container_width=True,
                 hide_index=True,
             )
-            st.bar_chart(active_load.set_index("region")["jobs"], height=min(220, 40 + len(active_load) * 28))
+            st.bar_chart(active_load.set_index("region")["jobs"], height=320)
             st.caption(
                 f"Jobs spread across **{len(active_load)}** of {len(REGIONS)} regions."
             )
@@ -1031,14 +1044,14 @@ with tab_ab:
                 comp["baseline_name"]: [comp["baseline_total_gco2"]],
             })
             st.markdown("**Carbon (gCO₂)**")
-            st.bar_chart(chart_df, color=["#22c55e", "#ef4444"], height=240)
+            st.bar_chart(chart_df, color=["#22c55e", "#ef4444"], height=320)
         with c2:
             cost_df = pd.DataFrame({
                 comp["eco_name"]: [comp["eco_total_cost_usd"]],
                 comp["baseline_name"]: [comp["baseline_total_cost_usd"]],
             })
             st.markdown("**Energy cost (USD)**")
-            st.bar_chart(cost_df, color=["#22c55e", "#ef4444"], height=240)
+            st.bar_chart(cost_df, color=["#22c55e", "#ef4444"], height=320)
 
         merged = pd.DataFrame(comp["eco_per_job"]).merge(
             pd.DataFrame(comp["baseline_per_job"]),
