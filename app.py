@@ -110,6 +110,26 @@ def _tab_intro(text: str) -> None:
     st.markdown(f'<div class="tab-intro">{text}</div>', unsafe_allow_html=True)
 
 
+def _render_stat_cards(
+    cards: list[tuple[str, str, str, str | None, str]],
+) -> None:
+    """Render summary metrics with large contrasting icons (icon, label, value, delta, accent)."""
+    parts: list[str] = ['<div class="stat-grid">']
+    for icon, label, value, delta, accent in cards:
+        delta_html = f'<div class="stat-delta">{delta}</div>' if delta else ""
+        parts.append(
+            f'<div class="stat-card">'
+            f'<div class="stat-icon-wrap stat-icon-{accent}">{icon}</div>'
+            f'<div class="stat-body">'
+            f'<div class="stat-label">{label}</div>'
+            f'<div class="stat-value">{value}</div>'
+            f"{delta_html}"
+            f"</div></div>"
+        )
+    parts.append("</div>")
+    st.markdown("".join(parts), unsafe_allow_html=True)
+
+
 def _format_locality(value: str | None) -> str:
     """Human-readable locality — None means the job can run in any region."""
     if value is None or (isinstance(value, float) and pd.isna(value)):
@@ -196,7 +216,7 @@ def _render_compact_carbon_strip(grid: dict[str, int], max_rows: int = 5) -> Non
         )
     st.markdown(
         f'<div class="panel-card">{"".join(rows)}'
-        f'<div style="font-size:0.75rem;color:#64748b;margin-top:6px">'
+        f'<div class="panel-muted" style="font-size:0.75rem;margin-top:6px">'
         f"Top {max_rows} shown · expand panel for all {len(REGIONS)} regions</div></div>",
         unsafe_allow_html=True,
     )
@@ -538,6 +558,8 @@ if st.session_state.forecast is None:
 
 # --- Sidebar ---
 with st.sidebar:
+    st.markdown(build_theme_css(st.session_state.theme), unsafe_allow_html=True)
+    st.markdown("### 🎨 Appearance")
     new_theme = (
         "dark"
         if st.toggle(
@@ -632,6 +654,7 @@ with st.sidebar:
         "Bar height (px)", 100, 280, st.session_state.carbon_chart_height, 10,
     )
 
+# Theme styles (main area — ensures boxes, charts, and tables pick up the active palette)
 st.markdown(build_theme_css(st.session_state.theme), unsafe_allow_html=True)
 
 # --- Hero ---
@@ -675,13 +698,14 @@ with tab_dash:
         "<strong>baseline → EcoRouter</strong> changes with color-coded savings."
     )
     cheapest = min(tariffs, key=tariffs.get)
-    m1, m2, m3, m4, m5, m6 = st.columns(6)
-    m1.metric("Regions", len(REGIONS))
-    m2.metric("Greenest", f"{greenest} ({grid[greenest]})")
-    m3.metric("Cheapest", f"{cheapest} (${tariffs[cheapest]:.3f})")
-    m4.metric("Pending Jobs", len(jobs))
-    m5.metric("Routing", ROUTING_MODE_LABELS.get(st.session_state.routing_mode, "—"))
-    m6.metric("Grid Source", st.session_state.grid_telemetry.get("source", "simulated")[:12])
+    _render_stat_cards([
+        ("🌍", "Regions", str(len(REGIONS)), None, "blue"),
+        ("🌿", "Greenest", f"{greenest}", f"{grid[greenest]:,} gCO₂/kWh", "green"),
+        ("💰", "Cheapest", cheapest, f"${tariffs[cheapest]:.3f}/kWh", "amber"),
+        ("📋", "Pending Jobs", str(len(jobs)), None, "purple"),
+        ("🧭", "Routing", ROUTING_MODE_LABELS.get(st.session_state.routing_mode, "—"), None, "slate"),
+        ("📡", "Grid Source", st.session_state.grid_telemetry.get("source", "simulated")[:12], None, "blue"),
+    ])
 
     st.markdown("<p class='section-title'>🌍 Live Grid Carbon Intensity</p>", unsafe_allow_html=True)
     if st.session_state.grid_chart_expanded:
@@ -753,27 +777,35 @@ with tab_dash:
     if st.session_state.optimized and st.session_state.assignments:
         st.markdown("### ✅ Dispatch Summary")
         comp = st.session_state.comparison
-        r1, r2, r3, r4, r5 = st.columns(5)
-        r1.metric("Jobs Routed", len(st.session_state.assignments))
         eco_total = comp["eco_total_gco2"] if comp else total_carbon_cost(
             jobs, grid, st.session_state.assignments
         )
         eco_cost_total = comp["eco_total_cost_usd"] if comp else total_energy_cost_usd(
             jobs, tariffs, st.session_state.assignments
         )
-        r2.metric("EcoRouter Carbon", f"{eco_total:,} gCO₂")
-        r3.metric("EcoRouter Cost", f"${eco_cost_total:.2f}")
+        summary_cards: list[tuple[str, str, str, str | None, str]] = [
+            ("✅", "Jobs Routed", str(len(st.session_state.assignments)), None, "green"),
+            ("🌱", "EcoRouter Carbon", f"{eco_total:,}", "gCO₂ total", "green"),
+            ("💵", "EcoRouter Cost", f"${eco_cost_total:.2f}", "energy spend", "amber"),
+        ]
         if comp:
-            r4.metric(
-                "Carbon Saved",
-                f"{comp['carbon_saved_gco2']:,} gCO₂",
-                f"{comp['savings_pct']}%",
-            )
-            r5.metric(
-                "Cost Saved",
-                f"${comp['cost_saved_usd']:.2f}",
-                f"{comp['cost_savings_pct']}%",
-            )
+            summary_cards.extend([
+                (
+                    "📉",
+                    "Carbon Saved",
+                    f"{comp['carbon_saved_gco2']:,}",
+                    f"{comp['savings_pct']}% vs baseline",
+                    "green",
+                ),
+                (
+                    "💰",
+                    "Cost Saved",
+                    f"${comp['cost_saved_usd']:.2f}",
+                    f"{comp['cost_savings_pct']}% vs baseline",
+                    "blue",
+                ),
+            ])
+        _render_stat_cards(summary_cards)
             tradeoff = comp.get("tradeoff_type", "")
             if tradeoff == "win_win":
                 st.success(comp.get("tradeoff_message", ""))
@@ -918,10 +950,11 @@ with tab_forecast:
         st.rerun()
 
     deferral = st.session_state.deferral or {}
-    f1, f2, f3 = st.columns(3)
-    f1.metric("Greenest Now", deferral.get("current_greenest", greenest))
-    f2.metric("Best Forecast Region", deferral.get("recommended_region", "—"))
-    f3.metric("Forecast Savings", f"{deferral.get('estimated_savings_pct', 0)}%")
+    _render_stat_cards([
+        ("🌿", "Greenest Now", deferral.get("current_greenest", greenest), None, "green"),
+        ("🔮", "Best Forecast", deferral.get("recommended_region", "—"), "12h window", "purple"),
+        ("📉", "Forecast Savings", f"{deferral.get('estimated_savings_pct', 0)}%", None, "blue"),
+    ])
 
     if deferral.get("should_defer"):
         st.info(f"**Deferral recommended:** {deferral.get('rationale', '')}")
@@ -964,19 +997,24 @@ with tab_ab:
         st.info("Run **EcoRouter Optimization** on the Live Dashboard tab to generate comparison data.")
     else:
         comp = st.session_state.comparison
-        a1, a2, a3, a4 = st.columns(4)
-        a1.metric("EcoRouter Carbon", f"{comp['eco_total_gco2']:,} gCO₂")
-        a2.metric("Baseline Carbon", f"{comp['baseline_total_gco2']:,} gCO₂")
-        a3.metric(
-            "Carbon Saved",
-            f"{comp['carbon_saved_gco2']:,} gCO₂",
-            f"{comp['savings_pct']}%",
-        )
-        a4.metric(
-            "Cost Saved",
-            f"${comp['cost_saved_usd']:.2f}",
-            f"{comp['cost_savings_pct']}%",
-        )
+        _render_stat_cards([
+            ("🌱", "EcoRouter Carbon", f"{comp['eco_total_gco2']:,}", "gCO₂", "green"),
+            ("🏭", "Baseline Carbon", f"{comp['baseline_total_gco2']:,}", "gCO₂", "red"),
+            (
+                "📉",
+                "Carbon Saved",
+                f"{comp['carbon_saved_gco2']:,}",
+                f"{comp['savings_pct']}%",
+                "green",
+            ),
+            (
+                "💰",
+                "Cost Saved",
+                f"${comp['cost_saved_usd']:.2f}",
+                f"{comp['cost_savings_pct']}%",
+                "blue",
+            ),
+        ])
 
         tradeoff = comp.get("tradeoff_type", "")
         if tradeoff == "win_win":
