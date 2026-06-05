@@ -66,42 +66,108 @@ st.set_page_config(page_title="EcoRouter", page_icon="🌱", layout="wide", init
 st.markdown(
     """
     <style>
-      .block-container { padding-top: 1.2rem; max-width: 1280px; }
+      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+      html, body, [class*="css"] { font-family: 'DM Sans', system-ui, sans-serif; }
+      .block-container { padding-top: 1rem; max-width: 1400px; }
       .ecorouter-hero {
-        background: linear-gradient(135deg, #0f172a 0%, #14532d 55%, #052e16 100%);
-        border-radius: 16px; padding: 1.5rem 2rem; margin-bottom: 1.25rem; color: #f8fafc;
+        background: linear-gradient(135deg, #0c1222 0%, #14532d 45%, #064e3b 100%);
+        border-radius: 20px; padding: 1.75rem 2.25rem; margin-bottom: 1.5rem; color: #f8fafc;
+        box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
       }
-      .ecorouter-hero h1 { margin: 0; font-size: 1.85rem; font-weight: 700; }
-      .ecorouter-hero p { margin: 0.35rem 0 0; color: #cbd5e1; font-size: 0.98rem; }
+      .ecorouter-hero h1 { margin: 0; font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
+      .ecorouter-hero p { margin: 0.5rem 0 0; color: #cbd5e1; font-size: 1.02rem; line-height: 1.55; }
       .ecorouter-pill {
-        display: inline-block; background: rgba(255,255,255,0.12);
-        border: 1px solid rgba(255,255,255,0.18); border-radius: 999px;
-        padding: 0.2rem 0.65rem; font-size: 0.75rem; margin-right: 0.4rem; margin-top: 0.6rem;
+        display: inline-block; background: rgba(255,255,255,0.14);
+        border: 1px solid rgba(255,255,255,0.22); border-radius: 999px;
+        padding: 0.28rem 0.75rem; font-size: 0.78rem; font-weight: 600;
+        margin-right: 0.45rem; margin-top: 0.65rem;
       }
-      .section-title { font-size: 1.02rem; font-weight: 700; color: #0f172a; margin: 0 0 0.65rem 0; }
-      .grid-row { margin-bottom: 0.75rem; }
-      .grid-label { display: flex; justify-content: space-between; font-size: 0.86rem; color: #334155; }
-      .grid-bar-track { height: 10px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 0.2rem; }
-      .grid-greenest {
-        background: #dcfce7; color: #166534; font-size: 0.7rem; font-weight: 600;
-        padding: 0.08rem 0.4rem; border-radius: 999px; margin-left: 0.3rem;
+      .section-title {
+        font-size: 1.12rem; font-weight: 700; color: #0f172a; margin: 0 0 0.75rem 0;
+        letter-spacing: -0.01em;
       }
-      .dispatch-card {
-        background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-        padding: 1rem 1.15rem; margin-bottom: 0.75rem;
+      .panel-card {
+        background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px;
+        padding: 1rem 1.15rem; margin-bottom: 1rem;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
       }
-      .badge-optimal { background: #dcfce7; color: #166534; border: 1px solid #86efac;
-        border-radius: 999px; padding: 0.15rem 0.55rem; font-size: 0.74rem; font-weight: 700; }
-      .badge-constraint { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d;
-        border-radius: 999px; padding: 0.15rem 0.55rem; font-size: 0.74rem; font-weight: 700; }
-      .badge-defer { background: #ede9fe; color: #5b21b6; border: 1px solid #c4b5fd;
-        border-radius: 999px; padding: 0.15rem 0.55rem; font-size: 0.74rem; font-weight: 700; }
-      .badge-route { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
-        border-radius: 999px; padding: 0.15rem 0.55rem; font-size: 0.74rem; }
+      .carbon-scroll-hint {
+        font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem; font-weight: 600;
+      }
+      .carbon-chart-scroll {
+        overflow-x: auto; overflow-y: hidden;
+        border: 1px solid #e2e8f0; border-radius: 14px;
+        padding: 14px 12px 10px; background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+        scrollbar-width: thin; scrollbar-color: #16a34a #e2e8f0;
+      }
+      .carbon-chart-scroll::-webkit-scrollbar { height: 10px; }
+      .carbon-chart-scroll::-webkit-scrollbar-thumb {
+        background: #16a34a; border-radius: 8px;
+      }
+      .carbon-chart-inner {
+        display: flex; align-items: flex-end; gap: 10px; padding-bottom: 4px;
+      }
+      .carbon-bar-col {
+        display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
+      }
+      .carbon-bar-value {
+        font-size: 0.82rem; font-weight: 700; color: #0f172a; margin-bottom: 6px;
+        white-space: nowrap;
+      }
+      .carbon-bar-wrap {
+        width: 100%; display: flex; align-items: flex-end; justify-content: center;
+        background: #e2e8f0; border-radius: 8px 8px 4px 4px; padding: 4px 4px 0;
+      }
+      .carbon-bar-fill {
+        width: 100%; min-height: 4px; border-radius: 6px 6px 2px 2px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        transition: height 0.25s ease;
+      }
+      .carbon-bar-region {
+        font-size: 0.72rem; font-weight: 700; color: #334155; margin-top: 8px;
+        text-align: center; line-height: 1.2; word-break: break-all;
+      }
+      .carbon-bar-label {
+        font-size: 0.65rem; color: #64748b; text-align: center; margin-top: 2px;
+      }
+      .carbon-bar-tariff {
+        font-size: 0.68rem; font-weight: 600; color: #0369a1; margin-top: 2px;
+      }
+      .bar-badge-green {
+        display: inline-block; background: #dcfce7; color: #166534;
+        font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+        margin-top: 3px;
+      }
+      .carbon-legend {
+        display: flex; gap: 1rem; margin-top: 0.65rem; flex-wrap: wrap;
+        font-size: 0.78rem; font-weight: 600; color: #475569;
+      }
+      .carbon-legend span::before {
+        content: ''; display: inline-block; width: 12px; height: 12px;
+        border-radius: 3px; margin-right: 6px; vertical-align: -2px;
+      }
+      .leg-lo::before { background: #22c55e; }
+      .leg-mid::before { background: #eab308; }
+      .leg-hi::before { background: #ef4444; }
+      .compact-grid-row {
+        display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+        font-size: 0.8rem;
+      }
+      .compact-grid-track {
+        flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden;
+      }
       div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #16a34a, #15803d); border: none; color: white;
-        font-weight: 700; border-radius: 10px; width: 100%;
+        font-weight: 700; border-radius: 12px; width: 100%;
+        box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
       }
+      div[data-testid="stMetric"] {
+        background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+        padding: 0.65rem 0.85rem; box-shadow: 0 1px 4px rgba(15,23,42,0.05);
+      }
+      div[data-testid="stMetric"] label { font-size: 0.78rem !important; font-weight: 600 !important; color: #64748b !important; }
+      div[data-testid="stMetric"] [data-testid="stMetricValue"] { font-size: 1.15rem !important; font-weight: 700 !important; }
+      .stTabs [data-baseweb="tab"] { font-weight: 600; font-size: 0.92rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -124,13 +190,88 @@ def _format_locality(value: str | None) -> str:
 
 def _intensity_color(value: int, max_val: int) -> str:
     ratio = value / max(max_val, 1)
-    if ratio <= 0.35:
+    if ratio <= 0.30:
         return "#22c55e"
-    if ratio <= 0.55:
+    if ratio <= 0.50:
         return "#84cc16"
-    if ratio <= 0.72:
+    if ratio <= 0.68:
         return "#eab308"
+    if ratio <= 0.82:
+        return "#f97316"
     return "#ef4444"
+
+
+def _render_scrollable_carbon_chart(
+    grid: dict[str, int],
+    tariffs: dict[str, float],
+    bar_width: int = 56,
+    chart_height: int = 180,
+) -> None:
+    """Horizontal-scroll bar chart — resize bars via sidebar controls."""
+    greenest = min(grid, key=grid.get)
+    max_val = max(grid.values()) or 1
+    cols: list[str] = []
+
+    for region in REGIONS:
+        value = grid[region]
+        h_pct = max(6, int((value / max_val) * 100))
+        color = _intensity_color(value, max_val)
+        geo = REGION_GEO.get(region, {})
+        badge = '<span class="bar-badge-green">GREENEST</span>' if region == greenest else ""
+        cols.append(
+            f'<div class="carbon-bar-col" style="width:{bar_width}px">'
+            f'<div class="carbon-bar-value">{value:,}</div>'
+            f'<div class="carbon-bar-wrap" style="height:{chart_height}px">'
+            f'<div class="carbon-bar-fill" style="height:{h_pct}%;background:{color}"></div>'
+            f"</div>"
+            f'<div class="carbon-bar-region">{region}</div>'
+            f'<div class="carbon-bar-label">{geo.get("label", "")}</div>'
+            f'<div class="carbon-bar-tariff">${tariffs.get(region, 0):.3f}/kWh</div>'
+            f"{badge}</div>"
+        )
+
+    inner_w = len(REGIONS) * (bar_width + 10) + 20
+    st.markdown(
+        f'<div class="carbon-scroll-hint">↔ Scroll horizontally — {len(REGIONS)} regions · '
+        f'drag bar width in sidebar to enlarge</div>'
+        f'<div class="carbon-chart-scroll">'
+        f'<div class="carbon-chart-inner" style="min-width:{inner_w}px">{"".join(cols)}</div>'
+        f"</div>"
+        f'<div class="carbon-legend">'
+        f'<span class="leg-lo">Low carbon</span>'
+        f'<span class="leg-mid">Medium</span>'
+        f'<span class="leg-hi">High carbon</span>'
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_compact_carbon_strip(grid: dict[str, int], max_rows: int = 5) -> None:
+    """Minimal horizontal bars when chart panel is collapsed."""
+    greenest = min(grid, key=grid.get)
+    max_val = max(grid.values()) or 1
+    sorted_regions = sorted(REGIONS, key=lambda r: grid[r])
+    rows: list[str] = []
+    for region in sorted_regions[:max_rows]:
+        value = grid[region]
+        width = int((value / max_val) * 100)
+        color = _intensity_color(value, max_val)
+        star = " ★" if region == greenest else ""
+        rows.append(
+            f'<div class="compact-grid-row">'
+            f'<span style="width:110px;font-weight:600">{region}{star}</span>'
+            f'<div class="compact-grid-track">'
+            f'<div style="width:{width}%;height:100%;background:{color};border-radius:999px"></div>'
+            f"</div>"
+            f'<span style="width:70px;text-align:right;font-weight:700">{value:,}</span>'
+            f"</div>"
+        )
+    st.markdown(
+        f'<div class="panel-card">{"".join(rows)}'
+        f'<div style="font-size:0.75rem;color:#64748b;margin-top:6px">'
+        f"Top {max_rows} shown · expand panel for all {len(REGIONS)} regions</div></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _load_grid(source: str | None = None, fluctuate: bool = False) -> dict[str, Any]:
@@ -170,6 +311,9 @@ def _init_session() -> None:
         "run_history": [],
         "rr_index": 0,
         "custom_jobs_loaded": False,
+        "grid_chart_expanded": True,
+        "carbon_bar_width": 56,
+        "carbon_chart_height": 180,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -283,24 +427,6 @@ def _run_optimization(include_baseline: bool = True) -> None:
         },
     )
     st.session_state.run_history = st.session_state.run_history[:20]
-
-
-def _grid_bars_html(grid: dict[str, int]) -> str:
-    greenest = min(grid, key=grid.get)
-    max_val = max(grid.values())
-    rows = []
-    for region in REGIONS:
-        value = grid[region]
-        width = int((value / max_val) * 100)
-        color = _intensity_color(value, max_val)
-        badge = '<span class="grid-greenest">GREENEST</span>' if region == greenest else ""
-        rows.append(
-            f'<div class="grid-row"><div class="grid-label">'
-            f'<span><strong>{region}</strong>{badge}</span><span>{value:,} gCO₂/kWh</span></div>'
-            f'<div class="grid-bar-track"><div style="width:{width}%;height:100%;'
-            f'background:{color};border-radius:999px;"></div></div></div>'
-        )
-    return "".join(rows)
 
 
 def _assignment_status(
@@ -465,6 +591,18 @@ with st.sidebar:
     st.caption(f"**Electricity Maps:** {'configured' if live_key else 'not set (simulated fallback)'}")
     st.caption(f"**Grid source:** {st.session_state.grid_telemetry.get('source', 'simulated')}")
     st.caption(f"**Updated:** {_utc_now()}")
+    st.markdown("---")
+    st.markdown("**Carbon chart display**")
+    st.session_state.grid_chart_expanded = st.toggle(
+        "Expand carbon chart panel",
+        value=st.session_state.grid_chart_expanded,
+    )
+    st.session_state.carbon_bar_width = st.slider(
+        "Bar width (px)", 36, 96, st.session_state.carbon_bar_width, 4,
+    )
+    st.session_state.carbon_chart_height = st.slider(
+        "Bar height (px)", 100, 280, st.session_state.carbon_chart_height, 10,
+    )
 
 # --- Hero ---
 st.markdown(
@@ -479,7 +617,7 @@ st.markdown(
     <span class="ecorouter-pill">SLA Deadlines</span>
     <span class="ecorouter-pill">ESG Export</span>
     <span class="ecorouter-pill">Pareto Routing</span>
-    <span class="ecorouter-pill">18 Regions</span></div>""",
+    <span class="ecorouter-pill">20 Regions</span></div>""",
     unsafe_allow_html=True,
 )
 
@@ -510,13 +648,39 @@ with tab_dash:
     m5.metric("Routing", ROUTING_MODE_LABELS.get(st.session_state.routing_mode, "—"))
     m6.metric("Grid Source", st.session_state.grid_telemetry.get("source", "simulated")[:12])
 
-    c1, c2 = st.columns([1.1, 0.9])
-    with c1:
-        st.markdown("<p class='section-title'>🌍 Live Grid Telemetry</p>", unsafe_allow_html=True)
-        df_grid = pd.DataFrame([{"Region": r, "gCO₂/kWh": grid[r]} for r in REGIONS])
-        st.bar_chart(df_grid.set_index("Region"), color="#22c55e", height=260)
-    with c2:
-        st.markdown(_grid_bars_html(grid), unsafe_allow_html=True)
+    st.markdown("<p class='section-title'>🌍 Live Grid Carbon Intensity</p>", unsafe_allow_html=True)
+    if st.session_state.grid_chart_expanded:
+        _render_scrollable_carbon_chart(
+            grid,
+            tariffs,
+            bar_width=st.session_state.carbon_bar_width,
+            chart_height=st.session_state.carbon_chart_height,
+        )
+        with st.expander("Full region data table", expanded=False):
+            df_grid = pd.DataFrame([
+                {
+                    "Region": r,
+                    "Location": REGION_GEO[r]["label"],
+                    "Carbon (gCO₂/kWh)": grid[r],
+                    "$/kWh": tariffs[r],
+                    "Status": "🟢 Greenest" if r == greenest else "",
+                }
+                for r in REGIONS
+            ])
+            st.dataframe(
+                df_grid.sort_values("Carbon (gCO₂/kWh)"),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Carbon (gCO₂/kWh)": st.column_config.NumberColumn(format="%d"),
+                    "$/kWh": st.column_config.NumberColumn(format="$%.3f"),
+                },
+            )
+    else:
+        _render_compact_carbon_strip(grid, max_rows=6)
+        if st.button("Expand full carbon chart", use_container_width=True):
+            st.session_state.grid_chart_expanded = True
+            st.rerun()
 
     st.info(
         "**Routing modes:** *Carbon-first* (mock/Gemini/forecast) minimizes gCO₂ and may "
@@ -591,10 +755,17 @@ with tab_dash:
         st.dataframe(dispatch_df, use_container_width=True, hide_index=True)
 
         load_df = pd.DataFrame(compute_load_distribution(st.session_state.assignments))
-        active_load = load_df[load_df["jobs"] > 0]
+        active_load = load_df[load_df["jobs"] > 0].sort_values("jobs", ascending=False)
         if not active_load.empty:
             st.markdown("#### Regional load distribution")
-            st.bar_chart(active_load.set_index("region")["jobs"], height=200)
+            st.dataframe(
+                active_load.rename(columns={
+                    "region": "Region", "jobs": "Jobs", "share_pct": "Share %",
+                }),
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.bar_chart(active_load.set_index("region")["jobs"], height=min(220, 40 + len(active_load) * 28))
             st.caption(
                 f"Jobs spread across **{len(active_load)}** of {len(REGIONS)} regions."
             )
@@ -919,7 +1090,7 @@ with tab_tools:
         )
         st.markdown("""
 **Endpoints:**
-- `GET /api/v1/regions` — 18-region catalog with geo + tariffs
+- `GET /api/v1/regions` — 20-region catalog with geo + tariffs
 - `GET /api/v1/regions/matrix?carbon_weight=0.6` — ranked optimizer matrix
 - `POST /api/v1/analyze?compute_hours=12&mode=pareto` — what-if job analyzer
 - `GET /api/v1/grid?source=live` — carbon + $/kWh tariffs
