@@ -177,14 +177,34 @@ def build_theme_css(theme: str) -> str:
         justify-content: center;
         font-size: 1.85rem;
         line-height: 1;
-        box-shadow: inset 0 -2px 0 rgba(0,0,0,0.12);
+        border: 2px solid transparent;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
+        filter: saturate(1.15) contrast(1.08);
       }}
-      .stat-icon-green {{ background: {t["icon_green"]}; }}
-      .stat-icon-blue {{ background: {t["icon_blue"]}; }}
-      .stat-icon-amber {{ background: {t["icon_amber"]}; }}
-      .stat-icon-purple {{ background: {t["icon_purple"]}; }}
-      .stat-icon-slate {{ background: {t["icon_slate"]}; }}
-      .stat-icon-red {{ background: {t["icon_red"]}; }}
+      .stat-icon-green {{
+        background: {t["icon_green_bg"]};
+        border-color: {t["icon_green_border"]};
+      }}
+      .stat-icon-blue {{
+        background: {t["icon_blue_bg"]};
+        border-color: {t["icon_blue_border"]};
+      }}
+      .stat-icon-amber {{
+        background: {t["icon_amber_bg"]};
+        border-color: {t["icon_amber_border"]};
+      }}
+      .stat-icon-purple {{
+        background: {t["icon_purple_bg"]};
+        border-color: {t["icon_purple_border"]};
+      }}
+      .stat-icon-slate {{
+        background: {t["icon_slate_bg"]};
+        border-color: {t["icon_slate_border"]};
+      }}
+      .stat-icon-red {{
+        background: {t["icon_red_bg"]};
+        border-color: {t["icon_red_border"]};
+      }}
       .stat-body {{ flex: 1; min-width: 0; }}
       .stat-label {{
         font-size: 0.72rem;
@@ -495,12 +515,18 @@ _TOKENS: dict[str, dict[str, str]] = {
         "input_bg": "#ffffff",
         "btn_secondary_bg": "#f1f5f9",
         "code_bg": "#f1f5f9",
-        "icon_green": "#16a34a",
-        "icon_blue": "#2563eb",
-        "icon_amber": "#d97706",
-        "icon_purple": "#7c3aed",
-        "icon_slate": "#475569",
-        "icon_red": "#dc2626",
+        "icon_green_bg": "#dcfce7",
+        "icon_green_border": "#15803d",
+        "icon_blue_bg": "#dbeafe",
+        "icon_blue_border": "#1d4ed8",
+        "icon_amber_bg": "#fef3c7",
+        "icon_amber_border": "#b45309",
+        "icon_purple_bg": "#ede9fe",
+        "icon_purple_border": "#6d28d9",
+        "icon_slate_bg": "#e2e8f0",
+        "icon_slate_border": "#334155",
+        "icon_red_bg": "#fee2e2",
+        "icon_red_border": "#b91c1c",
     },
     "dark": {
         "app_bg": "#0b1120",
@@ -547,11 +573,17 @@ _TOKENS: dict[str, dict[str, str]] = {
         "input_bg": "#1e293b",
         "btn_secondary_bg": "#334155",
         "code_bg": "#0f172a",
-        "icon_green": "#22c55e",
-        "icon_blue": "#3b82f6",
-        "icon_amber": "#f59e0b",
-        "icon_purple": "#a78bfa",
-        "icon_slate": "#64748b",
-        "icon_red": "#ef4444",
+        "icon_green_bg": "#064e3b",
+        "icon_green_border": "#4ade80",
+        "icon_blue_bg": "#1e3a8a",
+        "icon_blue_border": "#60a5fa",
+        "icon_amber_bg": "#78350f",
+        "icon_amber_border": "#fbbf24",
+        "icon_purple_bg": "#4c1d95",
+        "icon_purple_border": "#c4b5fd",
+        "icon_slate_bg": "#1e293b",
+        "icon_slate_border": "#94a3b8",
+        "icon_red_bg": "#7f1d1d",
+        "icon_red_border": "#f87171",
     },
 }
