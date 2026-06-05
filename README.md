@@ -182,33 +182,98 @@ See **[docs/TA_Access_Guide.md](docs/TA_Access_Guide.md)** for:
 
 ---
 
-## CS 153 Rubric Alignment
+## CS 153 Submission Rubric (15 Points)
+
+*Stanford CS 153 · The One-Person Frontier Lab · Track: **Automation / Agent Systems***
+
+| Rubric criterion | Where to see it |
+|------------------|-----------------|
+| Problem & Insight (3 pts) | README below · Video **Q1** · Live Dashboard problem framing |
+| Execution & Technical Work (5 pts) | README + architecture · Video **Q2** · Full app + API + CLI |
+| Evaluation & Evidence (3 pts) | A/B Comparison tab · constraint checks · iteration log below |
+| Communication & Presentation (2 pts) | This README · [TA Access Guide](docs/TA_Access_Guide.md) · demo video · teleprompter |
+| Process, Integrity & Disclosure (2 pts) | AI disclosure below · public GitHub · limitations below |
+
+### Video requirements mapping (demo ≤ 10 min; script targets ~6 min)
+
+| Video question | Script section | What you show |
+|----------------|----------------|---------------|
+| **Q1: Why did you build this?** | Problem & Insight | Bottleneck: AI electricity + regional grid carbon variance; manual FinOps does not scale |
+| **Q2: How does the product work?** | Execution (Agent Systems) | Grid sim → job queue → Gemini tool-calling agent → Pareto/forecast routers → dashboard + API |
+| **Q3: Use cases & societal impact?** | Use Cases | Cloud/AI labs, FinOps, DePIN — Scope 2 reduction without breaking SLAs |
+| **Q4: What more would you add?** | Future Work | K8s operator, RL over forecasts, per-tenant carbon budgets |
+
+Teleprompter: [PDF](docs/EcoRouter_Teleprompter_v2.pdf) · [Markdown](docs/EcoRouter_Teleprompter_v2_Script.md)
+
+---
 
 ### 1. Problem & Insight (3 pts)
 
-**Problem:** AI training and inference consume catastrophic electricity; grid carbon intensity varies by region and hour.
+**Problem:** AI training and inference consume catastrophic electricity; grid carbon intensity (gCO₂/kWh) varies by **region and hour** as renewables and demand shift.
 
-**Insight:** Replace manual DevOps/FinOps scheduling with an autonomous agent that routes workloads to the lowest-carbon region allowed by SLA and compliance constraints.
+**Motivation:** Data-center siting and batch scheduling are still largely manual — a bottleneck as AI workloads scale.
+
+**Insight:** Replace manual DevOps/FinOps scheduling with an **autonomous agent** that reads grid telemetry, respects SLA/compliance locality locks, and dispatches each job to the lowest-carbon region it can legally reach.
 
 ### 2. Execution & Technical Work (5 pts)
 
-End-to-end Python system: simulated grid (30 regions), realistic job queue, Gemini tool-calling agent, Pareto/cost-aware/forecast routing, Streamlit dashboard, FastAPI, ESG export. Reproducible via `requirements.txt`, CLI, and API.
+**Built artifact:** End-to-end Python agent system — not a slide deck or prototype UI only.
+
+| Component | Implementation |
+|-----------|----------------|
+| Grid simulator | 30 AWS regions, gCO₂/kWh + $/kWh tariffs; optional [Electricity Maps](https://www.electricitymaps.com/) live feed |
+| Job queue | Enterprise scenarios (fine-tune, RAG, GDPR/HIPAA locks, urgent vs flexible) |
+| Agent brain | Gemini 2.5 Flash **tool-calling** (`get_grid_carbon_intensity`, `assign_workload`) + Pareto / cost-aware / load-balanced / forecast routers + mock fallback |
+| Interfaces | Streamlit dashboard (6 tabs), FastAPI REST API, CLI agent loop, ESG PDF export |
+
+**Reproducibility:** `git clone` → `pip install -r requirements.txt` → `streamlit run app.py` (mock mode works with zero API keys). See [TA Access Guide](docs/TA_Access_Guide.md).
+
+**Iteration log (meaningful progress over time):**
+
+- Scaffold → functional agent with LLM tool-calling
+- SDK migration: `google-generativeai` → `google-genai`
+- Scale: 4 → **30** real AWS commercial regions
+- Added Pareto routing, 12h forecast deferral, A/B baseline comparison, load-spreading, BYO jobs, REST API
+- Public commit history: https://github.com/ashwin122705/ecorouter-agent/commits/main
 
 ### 3. Evaluation & Evidence (3 pts)
 
-- **Constraint satisfaction:** Locality-locked jobs never leave required region; urgent jobs respect deadlines
-- **Quantified A/B savings:** Grams CO₂ and USD saved vs static `us-east-1` or round-robin (often 50–90%+ on flexible batches)
-- **Iteration log:** SDK migration (`google-generativeai` → `google-genai`), rate-limit mock fallback, 4 → 30 regions, Pareto load-spreading
+| Evidence type | How EcoRouter validates claims |
+|---------------|-------------------------------|
+| **A/B comparison** | EcoRouter vs static `us-east-1` or round-robin — grams CO₂ and USD saved (often 50–90%+ on flexible batches) |
+| **Constraint satisfaction** | Locality-locked jobs never leave required region; urgent jobs respect deadlines (visible in assignment table) |
+| **Failure / fallback analysis** | Rate-limit and missing-key paths fall back to mock/Pareto — demo and grading never break |
+| **Limitations acknowledged** | Simulation environment (not production K8s); grid data simulated unless `ELECTRICITY_MAPS_API_KEY` set; savings are model-based on gCO₂ × compute-hours |
+| **External grounding** | Carbon intensity concept aligned with grid emissions data providers (Electricity Maps); AWS region catalog |
 
-### 4. Use Cases & Future (2 pts)
+Graders: **Live Dashboard → Run Optimization → A/B Comparison** tab for quantified savings.
 
-**Today:** Cloud providers, AI labs, FinOps teams, DePIN networks — reduce Scope 2 emissions without breaking SLAs.
+### 4. Communication & Presentation (2 pts)
 
-**Future:** Kubernetes operator, per-tenant carbon budgets, reinforcement learning over multi-day forecasts.
+- **README** (this file): problem, architecture, quick start, API, rubric alignment
+- **TA Access Guide:** 3-minute grading path, Streamlit Cloud deploy, troubleshooting
+- **Demo video:** Structured walkthrough covering Q1–Q4 (see teleprompter)
+- **In-app clarity:** Six labeled tabs, sidebar controls, color-coded assignment table, gCO₂ units on stat cards
+- **Engagement:** Interactive optimization — not a static recording of fake output
 
-### 5. Process & Disclosure (2 pts)
+### 5. Process, Integrity & Disclosure (2 pts)
 
-**AI tools used (CS 153 policy):** Cursor AI and Gemini for boilerplate, debugging, SDK migration, and UI iteration. All simulation logic, routing algorithms, and architecture are original to this project.
+**AI tools used (required CS 153 disclosure):**
+
+| Tool | How used |
+|------|----------|
+| **Cursor AI** | Boilerplate, debugging, UI/CSS iteration, SDK migration assistance, documentation drafts |
+| **Gemini API** | Runtime LLM tool-calling in the agent (`gemini-2.5-flash`) |
+
+All simulation logic, routing algorithms (Pareto, forecast overlay, load-spreading), and system architecture are **original to this project**. No forked base repository — built from scratch for CS 153.
+
+**Known limitations (honest scope):**
+
+- Software simulation — does not deploy real workloads to AWS
+- Carbon figures are illustrative unless live Electricity Maps key is configured
+- Peer-scale production hardening (auth, multi-tenant isolation) out of scope for 10-week sprint
+
+**Public artifacts:** Open GitHub repo, commit history, `docs/` folder (teleprompter, TA guide), session export JSON/CSV in app.
 
 ---
 

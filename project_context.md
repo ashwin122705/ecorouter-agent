@@ -1,41 +1,58 @@
 # EcoRouter: Project Context & Architecture
 
 ## 1. Project Background
-* **Class:** Stanford CS 153 (Frontier Systems) - Spring 2026.
-* **Prompt:** "The One-Person Frontier Lab." Scale yourself using modern AI tools to do the work of a full organization.
-* **Timeline:** 3-week sprint.
-* **Core Concept:** As AI scales, data center energy constraints and carbon footprints are the primary bottlenecks. EcoRouter simulates an autonomous LLM agent acting as a global infrastructure manager. It routes simulated AI compute workloads to data centers based on real-time grid carbon intensity, replacing the need for a manual DevOps/FinOps team.
 
-## 2. Technical Architecture ("The Digital Twin")
-Because of the 3-week timeline, this is a pure-software simulation (no physical server deployments).
+* **Class:** Stanford CS 153 — Large Language Model Agents (Spring 2026)
+* **Assignment:** The One-Person Frontier Lab (35% of grade)
+* **Track:** Automation / Agent Systems
+* **Author:** Ashwin
+* **Repository:** https://github.com/ashwin122705/ecorouter-agent
 
-1. **The Grid Simulator (`src/sim_environment/grid_data.py`)**
-   * Mocks a global cloud network (e.g., US-East, Europe-West, etc.).
-   * Generates live, fluctuating carbon intensity metrics (gCO₂/kWh) using baseline historical averages + random variance.
-2. **The Job Queue (`src/sim_environment/job_queue.py`)**
-   * Generates mock AI computing jobs (e.g., "train_llama3", "batch_image_processing").
-   * Injects constraints: `compute_hours`, `is_urgent` (can it be temporally shifted?), and `locality_constraint` (e.g., must stay in EU for GDPR).
-3. **The LLM Brain (`src/agents/ecorouter.py`)**
-   * A multi-agent system powered by LLM Tool Calling / Function Calling.
-   * **Goal:** Evaluate the job queue, call tools to check regional grid status, reason about the optimal location/time, and execute the assignment.
-4. **Live Telemetry & UI (`src/ui/app.py`)**
-   * Built with Streamlit.
-   * Visualizes the agent's real-time routing decisions, global grid status, and the job queue.
-   * *Future Feature:* A/B testing to compare the LLM's carbon footprint against a baseline "dumb" scheduler.
+**Core concept:** As AI scales, data-center energy and carbon are primary bottlenecks. EcoRouter is an autonomous LLM agent acting as a global infrastructure manager — routing simulated AI workloads to greener cloud regions based on grid carbon intensity, SLA deadlines, and compliance locality locks.
 
-## 3. Directory Structure
+## 2. CS 153 Rubric Alignment
+
+| Criterion | EcoRouter evidence |
+|-----------|-------------------|
+| Problem & Insight (3 pts) | AI electricity + regional grid variance; agent replaces manual scheduling |
+| Execution & Technical Work (5 pts) | Full stack: grid sim, job queue, Gemini tool-calling, routers, Streamlit, FastAPI, CLI |
+| Evaluation & Evidence (3 pts) | A/B comparison vs baseline, constraint checks, iteration log, documented limitations |
+| Communication & Presentation (2 pts) | README, TA guide, teleprompter, reproducible quick start |
+| Process & Disclosure (2 pts) | Cursor/Gemini AI disclosure, original code, public GitHub history |
+
+**Video Q1–Q4** covered in `docs/EcoRouter_Teleprompter_v2_Script.md`.
+
+## 3. Technical Architecture
+
+Pure-software simulation (no live AWS workload dispatch in scope).
+
+1. **Grid Simulator (`src/sim_environment/grid_data.py`)** — 30 AWS commercial regions, gCO₂/kWh, $/kWh tariffs; optional Electricity Maps live feed
+2. **Job Queue (`src/sim_environment/job_queue.py`)** — Enterprise scenarios (fine-tune, RAG, GDPR/HIPAA locks, urgent vs flexible)
+3. **Agent Brain (`src/agents/ecorouter.py`)** — Gemini 2.5 Flash tool-calling + Pareto / cost-aware / load-balanced / forecast routers + mock fallback
+4. **Analytics (`src/sim_environment/`)** — carbon_metrics, grid_forecast, routing_scores, baseline_scheduler, region_analytics
+5. **Interfaces** — `app.py` (Streamlit, 6 tabs), `src/api/server.py` (FastAPI), CLI, ESG PDF export
+
+## 4. Directory Structure
+
 ```text
 ecorouter-agent/
-├── .gitignore
+├── app.py                      # Main Streamlit dashboard
+├── theme_css.py
 ├── requirements.txt
-├── README.md
-├── index.html
-├── project_context.md         <-- This file
+├── README.md                   # Rubric alignment + quick start
+├── docs/
+│   ├── TA_Access_Guide.md
+│   ├── EcoRouter_Teleprompter_v2_Script.md
+│   └── EcoRouter_Teleprompter_v2.pdf
 └── src/
-    ├── agents/
-    │   └── ecorouter.py       (Currently scaffolded, needs LLM integration)
+    ├── agents/ecorouter.py
+    ├── api/server.py
     ├── sim_environment/
-    │   ├── grid_data.py       (Complete)
-    │   └── job_queue.py       (Complete)
-    └── ui/
-        └── app.py             (Basic Streamlit UI complete)
+    └── reports/esg_report.py
+```
+
+## 5. Known Limitations
+
+* Simulation environment — not a production Kubernetes operator
+* Grid carbon simulated unless `ELECTRICITY_MAPS_API_KEY` is set
+* Savings metrics are model-based (gCO₂ × compute-hours), not measured from real hardware

@@ -1,8 +1,8 @@
 # EcoRouter — Video Teleprompter Script (v2)
-**Ashwin · Stanford CS 153 · Automation / Agent Systems**  
-**Target length: 5:30 – 6:00 · Read at a natural, conversational pace**
+**Ashwin · Stanford CS 153 · Automation / Agent Systems · One-Person Frontier Lab**  
+**Target length: 5:30 – 6:00 · Under 10 min limit · Covers all 15 rubric points + video Q1–Q4**
 
-*Updated for the full dashboard: 30 AWS regions, Pareto routing, A/B comparison, 12h forecasting, REST API, and personalized workspace.*
+*Updated for official CS 153 submission rubric: Problem & Insight · Execution · Evaluation · Communication · Process & Disclosure.*
 
 ---
 
@@ -27,13 +27,13 @@ Hi, I'm Ashwin.
 
 This is **EcoRouter Agent** — an autonomous system that routes AI compute workloads to the greenest cloud regions in real time, while respecting urgency deadlines, SLA windows, and data residency rules.
 
-I built it for Stanford CS 153, Automation and Agent Systems track, as my One-Person Frontier Lab project.
+I built it for Stanford CS 153, **Automation and Agent Systems** track, as my **One-Person Frontier Lab** project.
 
 ---
 
-## [0:25 – 1:10] RUBRIC 1 — PROBLEM & INSIGHT (3 pts)
+## [0:25 – 1:05] VIDEO Q1 + RUBRIC 1 — PROBLEM & INSIGHT (3 pts)
 
-Why does this matter?
+**Why did I build this?**
 
 As AI scales, the bottleneck is not only GPUs — it's **electricity**. Training and batch inference consume massive power, and grid carbon intensity — grams of CO₂ per kilowatt-hour — **changes by region and by hour** as solar, wind, and demand shift.
 
@@ -43,23 +43,23 @@ Today, a DevOps or FinOps team manually watches grid data and decides where jobs
 
 ---
 
-## [1:10 – 2:20] RUBRIC 2 — EXECUTION & TECHNICAL WORK (5 pts)
+## [1:05 – 2:10] VIDEO Q2 + RUBRIC 2 — EXECUTION & TECHNICAL WORK (5 pts)
 
-Here is the architecture — four layers, all working end to end.
+**How exactly does the product work?** For an agent-systems project, here is the full stack.
 
-**Layer one — Grid simulator:** thirty real AWS regions with live simulated carbon and dollar-per-kilowatt-hour tariffs. Optional Electricity Maps integration for live data.
+**Layer one — Grid simulator:** thirty real AWS regions with simulated carbon and dollar-per-kilowatt-hour tariffs. Optional Electricity Maps integration for live data.
 
 **Layer two — Job queue:** realistic enterprise workloads — fine-tuning, RAG batches, GDPR-locked EU inference, HIPAA US jobs. Each job has compute hours, urgent versus flexible priority, and optional locality locks.
 
-**Layer three — Agent brain** in `ecorouter.py`: Gemini two-point-five Flash with **LLM tool-calling** — `get_grid_carbon_intensity` and `assign_workload`. Plus production routers: **Pareto**, cost-aware, load-balanced, and **forecast-aware deferral** over a twelve-hour window. A mock heuristic fallback guarantees the demo never breaks.
+**Layer three — Agent brain** in `ecorouter.py`: Gemini two-point-five Flash with **LLM tool-calling** — `get_grid_carbon_intensity` and `assign_workload`. The agent reasons over telemetry, then executes assignments. Plus production routers: **Pareto**, cost-aware, load-balanced, and **forecast-aware deferral** over a twelve-hour window. A mock heuristic fallback guarantees the demo never breaks.
 
-**Layer four — This dashboard:** Streamlit UI with scrollable carbon charts, region optimizer, A/B baseline comparison, enterprise BYO jobs, ESG PDF export, and a **FastAPI REST layer** for headless integration.
+**Layer four — Interfaces:** this Streamlit dashboard, a **FastAPI REST layer**, CLI agent loop, and ESG PDF export.
 
-Same logic runs from CLI, API, or UI — fully reproducible from the GitHub repo.
+Same logic runs from CLI, API, or UI — fully reproducible from the public GitHub repo with `requirements.txt`.
 
 ---
 
-## [2:20 – 2:45] DEMO — SETUP
+## [2:10 – 2:35] DEMO — SETUP
 
 Let me show it live.
 
@@ -73,7 +73,7 @@ Sidebar: I'll run **Pareto routing** with **forecast-aware scheduling** enabled.
 
 ---
 
-## [2:45 – 3:30] DEMO — OPTIMIZATION
+## [2:35 – 3:20] DEMO — OPTIMIZATION
 
 *[Click: Run EcoRouter Optimization — wait for spinner]*
 
@@ -87,7 +87,7 @@ The **assignment table** shows baseline versus EcoRouter per job: green rows mea
 
 ---
 
-## [3:30 – 4:00] DEMO — A/B & FORECAST TABS
+## [3:20 – 3:50] DEMO — A/B & FORECAST
 
 Switch to **A/B Comparison**.
 
@@ -97,23 +97,9 @@ Open **Forecast and Deferral**: twelve-hour per-region forecast and deferral rec
 
 ---
 
-## [4:00 – 4:35] RUBRIC 3 — EVALUATION & EVIDENCE (3 pts)
+## [3:50 – 4:15] VIDEO Q3 — USE CASES & SOCIETAL IMPACT
 
-How do we know it works?
-
-First, **constraint satisfaction**: locality-locked jobs never leave their required region. Urgent jobs respect SLA deadlines.
-
-Second, **quantified savings**: the A/B tab reports grams of CO₂ and dollars saved versus baseline, with per-job breakdowns.
-
-Third, **iteration evidence**: I migrated from deprecated `google-generativeai` to `google-genai`, added rate-limit fallback to mock routing, and expanded from four regions to thirty with Pareto and forecast overlays — documented in the README execution log.
-
-The **Tools and API** tab shows curl examples — graders can hit `/api/v1/optimize` without the UI.
-
----
-
-## [4:35 – 5:05] RUBRIC 4 — USE CASES & FUTURE (2 pts)
-
-Who uses this?
+**Who uses this and why does it matter?**
 
 **Cloud providers and AI labs** plug it into batch schedulers to cut Scope 2 emissions without breaking SLAs.
 
@@ -121,17 +107,45 @@ Who uses this?
 
 **DePIN and distributed compute** networks apply the same logic wherever workloads are geographically mobile.
 
-If I kept building: production Kubernetes operator, reinforcement learning over long-horizon forecasts, and customer-specific carbon budgets per tenant.
+The impact: greener AI infrastructure without asking humans to manually chase grid data every hour.
 
 ---
 
-## [5:05 – 5:35] RUBRIC 5 — PROCESS & DISCLOSURE (2 pts)
+## [4:15 – 4:45] RUBRIC 3 — EVALUATION & EVIDENCE (3 pts)
 
-Process and integrity: I used **Cursor and Gemini** as accelerators for boilerplate, debugging, and SDK migration — disclosed in the README. All simulation logic and routing design are original to this project.
+How do we know it works?
+
+First, **constraint satisfaction**: locality-locked jobs never leave their required region. Urgent jobs respect SLA deadlines — check the assignment table.
+
+Second, **quantified savings**: the A/B tab reports grams of CO₂ and dollars saved versus baseline, with per-job breakdowns.
+
+Third, **iteration and limitations**: I migrated from deprecated `google-generativeai` to `google-genai`, added rate-limit fallback to mock routing, and expanded from four regions to thirty — all documented in the README with public commit history. This is a **simulation** — not production Kubernetes yet — and savings are model-based on compute-hours times grid intensity.
+
+The **Tools and API** tab shows curl examples — graders can hit `/api/v1/optimize` without the UI.
 
 ---
 
-## [5:35 – 6:00] CLOSE
+## [4:45 – 5:10] RUBRIC 4 — COMMUNICATION & PRESENTATION (2 pts)
+
+For anyone outside the project: the README documents architecture, quick start, and this rubric mapping. The **TA Access Guide** gives a three-minute grading path. Clone, install, and run with mock mode — no API key required. This demo walks tab by tab so the system is understandable and reproducible, not just a static screenshot.
+
+---
+
+## [5:10 – 5:30] VIDEO Q4 — FUTURE WORK
+
+**What more would I add?**
+
+A production **Kubernetes operator** that watches real cluster queues, reinforcement learning over multi-day carbon forecasts, and per-tenant carbon budgets for enterprise ESG reporting.
+
+---
+
+## [5:30 – 5:50] RUBRIC 5 — PROCESS, INTEGRITY & DISCLOSURE (2 pts)
+
+Process and integrity: I used **Cursor and Gemini** as accelerators for boilerplate, debugging, and SDK migration — fully disclosed in the README per CS 153 AI policy. All simulation logic and routing design are original to this project; no forked base repo. Major limitations — simulated grid, mock fallback, no live AWS dispatch — are documented openly.
+
+---
+
+## [5:50 – 6:00] CLOSE
 
 The full project is open source:
 
@@ -148,23 +162,31 @@ Thank you for watching.
 | Time | On-screen action |
 |------|------------------|
 | 0:20 | Point at hero stats (regions, greenest, gCO₂ saved) |
-| 1:10 | Gesture at four architecture layers (chart → queue → button → tabs) |
-| 2:25 | Scroll carbon bar chart horizontally |
-| 2:35 | Point at job queue Locality column (GDPR / Any region) |
-| 2:42 | Show sidebar: Pareto + Forecast toggle ON |
-| 2:45 | **CLICK: Run EcoRouter Optimization** |
-| 3:00 | Point at EcoRouter Carbon and Carbon Saved stat cards (gCO₂ units) |
-| 3:10 | Point at multi-region routing caption |
-| 3:20 | Scroll assignment overview color-coded table |
-| 3:32 | **CLICK: A/B Comparison tab** — point at savings % |
-| 3:45 | **CLICK: Forecast tab** — show 12h line chart |
-| 4:10 | **CLICK: Tools & API tab** — flash curl example |
-| 5:40 | Show GitHub URL + README on screen |
+| 1:05 | Gesture at four architecture layers (chart → queue → agent → tabs) |
+| 2:15 | Scroll carbon bar chart horizontally |
+| 2:25 | Point at job queue Locality column (GDPR / Any region) |
+| 2:30 | Show sidebar: Pareto + Forecast toggle ON |
+| 2:35 | **CLICK: Run EcoRouter Optimization** |
+| 2:50 | Point at EcoRouter Carbon and Carbon Saved stat cards (gCO₂ units) |
+| 3:00 | Point at multi-region routing caption |
+| 3:10 | Scroll assignment overview color-coded table |
+| 3:22 | **CLICK: A/B Comparison tab** — point at savings % |
+| 3:40 | **CLICK: Forecast tab** — show 12h line chart |
+| 4:20 | **CLICK: Tools & API tab** — flash curl + CS 153 rubric expander |
+| 5:52 | Show GitHub URL + README rubric section on screen |
 
 ---
 
+## RUBRIC & VIDEO CHECKLIST
+
+- [x] Problem & Insight (3 pts) — Q1 @ 0:25
+- [x] Execution & Technical Work (5 pts) — Q2 @ 1:05 + live demo
+- [x] Evaluation & Evidence (3 pts) — A/B tab + constraints + limitations @ 4:15
+- [x] Communication & Presentation (2 pts) — README/TA guide/reproducibility @ 4:45
+- [x] Process & Disclosure (2 pts) — AI tools + limitations @ 5:30
+- [x] Video Q3 use cases @ 3:50
+- [x] Video Q4 future work @ 5:10
+
 **Fallback:** `ECOROUTER_USE_MOCK=1` in `.env` — identical demo, no Gemini quota needed.
 
-**PDF for recording:** [EcoRouter_Teleprompter_v2.pdf](EcoRouter_Teleprompter_v2.pdf) (or open `EcoRouter_Teleprompter_v2.html` → Cmd+P → Save as PDF).
-
-**Regenerate PDF:** `./scripts/generate_teleprompter_pdf.sh`
+**PDF for recording:** [EcoRouter_Teleprompter_v2.pdf](EcoRouter_Teleprompter_v2.pdf) · Regenerate: `./scripts/generate_teleprompter_pdf.sh`

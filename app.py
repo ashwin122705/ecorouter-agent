@@ -152,7 +152,7 @@ def _render_hero(
 
     name = user_name.strip()
     title = f"🌱 EcoRouter — {name}" if name else "🌱 EcoRouter Agent"
-    eyebrow = "Stanford CS 153 · Carbon-aware orchestration"
+    eyebrow = "Stanford CS 153 · One-Person Frontier Lab · Automation / Agent Systems"
     if name and user_home_region:
         eyebrow = f"{eyebrow} · {_region_label(user_home_region)} workspace"
     if name or locality_mode != "scenario_mix":
@@ -1480,7 +1480,7 @@ with tab_tools:
         )
         st.markdown("""
 **Endpoints:**
-- `GET /api/v1/regions` — 20-region catalog with geo + tariffs
+- `GET /api/v1/regions` — 30-region catalog with geo + tariffs
 - `GET /api/v1/regions/matrix?carbon_weight=0.6` — ranked optimizer matrix
 - `POST /api/v1/analyze?compute_hours=12&mode=pareto` — what-if job analyzer
 - `GET /api/v1/grid?source=live` — carbon + $/kWh tariffs
@@ -1501,6 +1501,30 @@ with tab_tools:
         st.dataframe(pd.DataFrame(st.session_state.run_history), use_container_width=True, hide_index=True)
     else:
         st.caption("No runs yet.")
+
+    with st.expander("📋 CS 153 Submission — Rubric & Video Guide", expanded=False):
+        st.markdown("""
+**Track:** Automation / Agent Systems · **Repo:** [github.com/ashwin122705/ecorouter-agent](https://github.com/ashwin122705/ecorouter-agent)
+
+| Rubric (15 pts) | See in this app |
+|-----------------|-----------------|
+| **Problem & Insight (3)** | Hero + job queue locality constraints |
+| **Execution (5)** | Run Optimization · 6 tabs · REST API below |
+| **Evaluation (3)** | **A/B Comparison** tab after optimization |
+| **Communication (2)** | README · [TA Access Guide](https://github.com/ashwin122705/ecorouter-agent/blob/main/docs/TA_Access_Guide.md) · this walkthrough |
+| **Process & Disclosure (2)** | README AI disclosure · limitations · public commit history |
+
+**Demo video questions (≤10 min):**
+
+1. **Why build this?** — AI electricity bottleneck; agent replaces manual FinOps scheduling
+2. **How does it work?** — Grid sim → job queue → Gemini tool-calling → Pareto/forecast routers → dashboard + API
+3. **Use cases?** — Cloud/AI labs, FinOps, DePIN — Scope 2 reduction without breaking SLAs
+4. **What more?** — K8s operator, RL forecasts, per-tenant carbon budgets
+
+**Grading path:** Live Dashboard → **Run EcoRouter Optimization** → **A/B Comparison** → verify gCO₂ savings.
+
+**Teleprompter PDF:** `docs/EcoRouter_Teleprompter_v2.pdf` in the repo.
+        """)
 
     st.markdown("#### Cloudflare edge (roadmap)")
     st.caption(
