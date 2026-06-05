@@ -62,20 +62,32 @@ def normalize_job(raw: dict[str, Any], index: int = 0) -> dict[str, Any]:
     }
 
 
+def _pick_locality_constraint(num_jobs: int, locked_so_far: int) -> str | None:
+    """Rare locality locks so most jobs can be carbon-optimized across regions."""
+    max_locked = max(1, num_jobs // 8)
+    if locked_so_far >= max_locked:
+        return None
+    if random.random() < 0.15:
+        return random.choice(REGIONS)
+    return None
+
+
 def generate_mock_jobs(num_jobs: int = 5) -> list[dict[str, Any]]:
     """Generate mock AI compute workloads with SLA deadlines."""
     jobs: list[dict[str, Any]] = []
+    locked = 0
     for i in range(num_jobs):
-        is_urgent = random.choice([True, False])
+        is_urgent = random.random() < 0.35
+        locality = _pick_locality_constraint(num_jobs, locked)
+        if locality:
+            locked += 1
         jobs.append(
             normalize_job(
                 {
                     "task": random.choice(JOB_TYPES),
-                    "compute_hours": random.randint(1, 24),
+                    "compute_hours": random.randint(8, 32),
                     "is_urgent": is_urgent,
-                    "locality_constraint": random.choice(
-                        [None] * 6 + random.sample(REGIONS, k=min(6, len(REGIONS)))
-                    ),
+                    "locality_constraint": locality,
                     "deadline_utc": _default_deadline(6 if is_urgent else random.randint(24, 96)),
                 },
                 index=i,

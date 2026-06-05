@@ -110,6 +110,75 @@ def _tab_intro(text: str) -> None:
     st.markdown(f'<div class="tab-intro">{text}</div>', unsafe_allow_html=True)
 
 
+THEME = "dark"
+
+
+def _render_hero(
+    region_count: int,
+    grid: dict[str, int],
+    greenest: str,
+    comparison: dict[str, Any] | None = None,
+) -> None:
+    """Top title block with live impact stats."""
+    baseline_region = "us-east-1"
+    baseline_intensity = grid.get(baseline_region, 380)
+    greenest_intensity = grid[greenest]
+    potential_pct = round(
+        100 * (1 - greenest_intensity / max(baseline_intensity, 1)),
+        1,
+    )
+
+    if comparison and comparison.get("carbon_saved_gco2", 0) > 0:
+        impact_value = f"{comparison['carbon_saved_gco2']:,}"
+        impact_label = f"gCO₂ saved ({comparison['savings_pct']}%)"
+        impact_class = "hero-stat-highlight"
+        impact_sub = (
+            f"EcoRouter beat {comparison.get('baseline_name', 'baseline')} "
+            f"on this batch"
+        )
+    else:
+        impact_value = f"{potential_pct}%"
+        impact_label = "carbon upside vs us-east-1"
+        impact_class = "hero-stat-highlight"
+        impact_sub = (
+            f"Run optimization to route flexible jobs toward {greenest} "
+            f"({greenest_intensity:,} gCO₂/kWh)"
+        )
+
+    st.markdown(
+        f'<div class="ecorouter-hero">'
+        f'<div class="hero-top">'
+        f'<div class="hero-brand">'
+        f'<div class="hero-eyebrow">Stanford CS 153 · Carbon-aware orchestration</div>'
+        f"<h1>🌱 EcoRouter Agent</h1>"
+        f'<p class="hero-lead">Autonomous workload routing across {region_count} global regions. '
+        f"EcoRouter reads live grid carbon and cost telemetry, then dispatches AI jobs to "
+        f"greener regions while respecting SLA deadlines and rare compliance locks. "
+        f"{impact_sub}.</p>"
+        f"</div>"
+        f'<div class="hero-impact">'
+        f'<div class="hero-stat"><span class="hero-stat-num">{region_count}</span>'
+        f'<span class="hero-stat-lbl">Regions</span></div>'
+        f'<div class="hero-stat"><span class="hero-stat-num">{greenest}</span>'
+        f'<span class="hero-stat-lbl">{greenest_intensity:,} gCO₂/kWh</span></div>'
+        f'<div class="hero-stat {impact_class}"><span class="hero-stat-num">{impact_value}</span>'
+        f'<span class="hero-stat-lbl">{impact_label}</span></div>'
+        f'<div class="hero-stat"><span class="hero-stat-num">{baseline_region}</span>'
+        f'<span class="hero-stat-lbl">{baseline_intensity:,} gCO₂ baseline</span></div>'
+        f"</div></div>"
+        f'<div class="hero-pills">'
+        f'<span class="ecorouter-pill">LLM Tool Calling</span>'
+        f'<span class="ecorouter-pill">Pareto Routing</span>'
+        f'<span class="ecorouter-pill">12h Forecasting</span>'
+        f'<span class="ecorouter-pill">A/B Carbon Analysis</span>'
+        f'<span class="ecorouter-pill">FinOps $/kWh</span>'
+        f'<span class="ecorouter-pill">REST API</span>'
+        f'<span class="ecorouter-pill">{region_count} Regions</span>'
+        f"</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _render_stat_cards(
     cards: list[tuple[str, str, str, str | None, str]],
 ) -> None:
@@ -254,14 +323,14 @@ def _init_session() -> None:
         "grid_status": telemetry["carbon_gco2_per_kwh"],
         "tariffs": telemetry["cost_usd_per_kwh"],
         "grid_source": "simulated",
-        "jobs": generate_mock_jobs(num_jobs=4),
+        "jobs": generate_mock_jobs(num_jobs=6),
         "assignments": None,
         "baseline_assignments": None,
         "comparison": None,
         "router": None,
         "model": None,
         "optimized": False,
-        "num_jobs": 4,
+        "num_jobs": 6,
         "routing_mode": "pareto",
         "carbon_weight": 0.6,
         "use_forecast": False,
@@ -274,11 +343,11 @@ def _init_session() -> None:
         "grid_chart_expanded": True,
         "carbon_bar_width": 56,
         "carbon_chart_height": 180,
-        "theme": "light",
     }
     for key, val in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = val
+    st.session_state.theme = THEME
 
 
 def _refresh_telemetry(fluctuate: bool = False, reload_jobs: bool = True) -> None:
@@ -570,21 +639,7 @@ if st.session_state.forecast is None:
 
 # --- Sidebar ---
 with st.sidebar:
-    st.markdown(build_theme_css(st.session_state.theme), unsafe_allow_html=True)
-    st.markdown("### 🎨 Appearance")
-    new_theme = (
-        "dark"
-        if st.toggle(
-            "Dark mode",
-            value=st.session_state.theme == "dark",
-            help="Switch between light and dark backgrounds for charts, tables, and panels",
-        )
-        else "light"
-    )
-    if new_theme != st.session_state.theme:
-        st.session_state.theme = new_theme
-        st.rerun()
-    st.markdown("---")
+    st.markdown(build_theme_css(THEME), unsafe_allow_html=True)
     st.markdown("### ⚙️ Controls")
     cap = min(40, MAX_BATCH_JOBS)
     if st.session_state.num_jobs > cap:
@@ -666,30 +721,14 @@ with st.sidebar:
         "Bar height (px)", 100, 280, st.session_state.carbon_chart_height, 10,
     )
 
-# Theme styles (main area — ensures boxes, charts, and tables pick up the active palette)
-st.markdown(build_theme_css(st.session_state.theme), unsafe_allow_html=True)
-
-# --- Hero ---
-st.markdown(
-    """<div class="ecorouter-hero"><h1>🌱 EcoRouter</h1>
-    <p>Carbon-aware AI workload orchestration with live telemetry, 12h forecasting,
-    A/B baseline comparison, and a REST API.</p>
-    <span class="ecorouter-pill">LLM Tool Calling</span>
-    <span class="ecorouter-pill">Grid Forecasting</span>
-    <span class="ecorouter-pill">A/B Carbon Analysis</span>
-    <span class="ecorouter-pill">REST API</span>
-    <span class="ecorouter-pill">FinOps $/kWh</span>
-    <span class="ecorouter-pill">SLA Deadlines</span>
-    <span class="ecorouter-pill">ESG Export</span>
-    <span class="ecorouter-pill">Pareto Routing</span>
-    <span class="ecorouter-pill">20 Regions</span></div>""",
-    unsafe_allow_html=True,
-)
+st.markdown(build_theme_css(THEME), unsafe_allow_html=True)
 
 grid = st.session_state.grid_status
 tariffs = st.session_state.tariffs
 jobs = st.session_state.jobs
 greenest = min(grid, key=grid.get)
+
+_render_hero(len(REGIONS), grid, greenest, st.session_state.comparison)
 
 tab_dash, tab_optimizer, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.tabs(
     [
@@ -705,9 +744,10 @@ tab_dash, tab_optimizer, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.ta
 # ===================== TAB 1: DASHBOARD =====================
 with tab_dash:
     _tab_intro(
-        "Monitor live grid carbon across 20 regions, review the pending job queue, "
-        "and run optimization. After routing, the assignment overview highlights "
-        "<strong>baseline → EcoRouter</strong> changes with color-coded savings."
+        f"Monitor live grid carbon across {len(REGIONS)} regions, review the pending job queue, "
+        "and run optimization. Most jobs are <strong>region-flexible</strong> so EcoRouter can "
+        "re-route away from the static us-east-1 baseline. After routing, the assignment overview "
+        "highlights <strong>baseline → EcoRouter</strong> changes with color-coded savings."
     )
     cheapest = min(tariffs, key=tariffs.get)
     _render_stat_cards([
@@ -842,7 +882,7 @@ with tab_dash:
             "🟠 Amber = rerouted · ⬜ Gray = same as baseline"
         )
         st.dataframe(
-            _style_assignment_overview(dispatch_df, st.session_state.theme),
+            _style_assignment_overview(dispatch_df, THEME),
             use_container_width=True,
             hide_index=True,
             column_config={

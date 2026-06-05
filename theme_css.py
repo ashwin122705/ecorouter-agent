@@ -17,9 +17,14 @@ def build_theme_css(theme: str) -> str:
         color: {t["text"]};
       }}
       .main .block-container {{
-        padding-top: 1rem;
-        max-width: 1400px;
+        padding-top: 0.75rem;
+        padding-left: 1.25rem;
+        padding-right: 1.25rem;
+        max-width: min(2200px, 98vw);
         color: {t["text"]};
+      }}
+      [data-testid="stAppViewContainer"] section.main > div {{
+        max-width: 100%;
       }}
 
       /* --- Sidebar --- */
@@ -59,18 +64,63 @@ def build_theme_css(theme: str) -> str:
 
       .ecorouter-hero {{
         background: {t["hero_bg"]};
-        border-radius: 20px; padding: 1.75rem 2.25rem; margin-bottom: 1.5rem;
+        border-radius: 22px; padding: 1.85rem 2.35rem 1.65rem; margin-bottom: 1.35rem;
         color: {t["hero_text"]};
         box-shadow: {t["hero_shadow"]};
         border: 1px solid {t["hero_border"]};
       }}
-      .ecorouter-hero h1 {{ margin: 0; font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; color: {t["hero_text"]} !important; }}
-      .ecorouter-hero p {{ margin: 0.5rem 0 0; color: {t["hero_sub"]} !important; font-size: 1.02rem; line-height: 1.55; }}
+      .hero-top {{
+        display: flex; flex-wrap: wrap; align-items: stretch;
+        justify-content: space-between; gap: 1.5rem;
+      }}
+      .hero-brand {{ flex: 1 1 420px; min-width: 280px; }}
+      .hero-eyebrow {{
+        font-size: 0.78rem; font-weight: 700; letter-spacing: 0.14em;
+        text-transform: uppercase; color: {t["hero_accent"]} !important; margin-bottom: 0.45rem;
+      }}
+      .ecorouter-hero h1 {{
+        margin: 0; font-size: 2.65rem; font-weight: 800; letter-spacing: -0.03em;
+        color: {t["hero_text"]} !important; line-height: 1.05;
+      }}
+      .hero-lead {{
+        margin: 0.75rem 0 0; color: {t["hero_sub"]} !important;
+        font-size: 1.06rem; line-height: 1.6; max-width: 52rem;
+      }}
+      .hero-impact {{
+        display: flex; flex-wrap: wrap; gap: 10px;
+        flex: 0 1 auto; align-items: stretch;
+      }}
+      .hero-stat {{
+        background: {t["hero_stat_bg"]};
+        border: 1px solid {t["hero_stat_border"]};
+        border-radius: 14px; padding: 0.85rem 1rem; min-width: 118px;
+        text-align: center;
+      }}
+      .hero-stat-num {{
+        display: block; font-size: 1.55rem; font-weight: 800;
+        color: {t["hero_text"]} !important; line-height: 1.1;
+      }}
+      .hero-stat-lbl {{
+        display: block; font-size: 0.68rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        color: {t["hero_sub"]} !important; margin-top: 4px;
+      }}
+      .hero-stat-highlight {{
+        border-color: {t["hero_accent"]};
+        box-shadow: 0 0 0 1px {t["hero_accent"]} inset;
+      }}
+      .hero-stat-highlight .hero-stat-num {{
+        color: {t["hero_accent"]} !important;
+      }}
+      .hero-pills {{
+        margin-top: 1.15rem; padding-top: 1rem;
+        border-top: 1px solid {t["hero_divider"]};
+      }}
       .ecorouter-pill {{
         display: inline-block; background: {t["pill_bg"]};
         border: 1px solid {t["pill_border"]}; border-radius: 999px;
         padding: 0.28rem 0.75rem; font-size: 0.78rem; font-weight: 600;
-        margin-right: 0.45rem; margin-top: 0.65rem; color: {t["hero_text"]} !important;
+        margin-right: 0.45rem; margin-top: 0.5rem; color: {t["hero_text"]} !important;
       }}
 
       .section-title {{
@@ -417,6 +467,10 @@ _TOKENS: dict[str, dict[str, str]] = {
         "hero_sub": "#cbd5e1",
         "hero_border": "transparent",
         "hero_shadow": "0 12px 40px rgba(15, 23, 42, 0.18)",
+        "hero_accent": "#86efac",
+        "hero_stat_bg": "rgba(255,255,255,0.1)",
+        "hero_stat_border": "rgba(255,255,255,0.18)",
+        "hero_divider": "rgba(255,255,255,0.14)",
         "pill_bg": "rgba(255,255,255,0.14)",
         "pill_border": "rgba(255,255,255,0.22)",
         "intro_bg": "#ecfdf5",
@@ -465,6 +519,10 @@ _TOKENS: dict[str, dict[str, str]] = {
         "hero_sub": "#cbd5e1",
         "hero_border": "#334155",
         "hero_shadow": "0 12px 40px rgba(0, 0, 0, 0.45)",
+        "hero_accent": "#4ade80",
+        "hero_stat_bg": "rgba(15, 23, 42, 0.55)",
+        "hero_stat_border": "rgba(71, 85, 105, 0.9)",
+        "hero_divider": "rgba(71, 85, 105, 0.65)",
         "pill_bg": "rgba(255,255,255,0.08)",
         "pill_border": "rgba(255,255,255,0.16)",
         "intro_bg": "#064e3b",
