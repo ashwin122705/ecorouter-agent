@@ -58,170 +58,11 @@ from sim_environment.job_queue import (  # noqa: E402
     sample_jobs_json,
 )
 from sim_environment.sla import hours_until_deadline  # noqa: E402
+from theme_css import assignment_row_colors, build_theme_css  # noqa: E402
 
 load_dotenv(ROOT / ".env")
 
 st.set_page_config(page_title="EcoRouter", page_icon="🌱", layout="wide", initial_sidebar_state="expanded")
-
-st.markdown(
-    """
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
-      html, body, [class*="css"] { font-family: 'DM Sans', system-ui, sans-serif; }
-      .block-container { padding-top: 1rem; max-width: 1400px; }
-      .ecorouter-hero {
-        background: linear-gradient(135deg, #0c1222 0%, #14532d 45%, #064e3b 100%);
-        border-radius: 20px; padding: 1.75rem 2.25rem; margin-bottom: 1.5rem; color: #f8fafc;
-        box-shadow: 0 12px 40px rgba(15, 23, 42, 0.18);
-      }
-      .ecorouter-hero h1 { margin: 0; font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; }
-      .ecorouter-hero p { margin: 0.5rem 0 0; color: #cbd5e1; font-size: 1.02rem; line-height: 1.55; }
-      .ecorouter-pill {
-        display: inline-block; background: rgba(255,255,255,0.14);
-        border: 1px solid rgba(255,255,255,0.22); border-radius: 999px;
-        padding: 0.28rem 0.75rem; font-size: 0.78rem; font-weight: 600;
-        margin-right: 0.45rem; margin-top: 0.65rem;
-      }
-      .section-title {
-        font-size: 1.12rem; font-weight: 700; color: #0f172a; margin: 0 0 0.75rem 0;
-        letter-spacing: -0.01em;
-      }
-      .panel-card {
-        background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px;
-        padding: 1rem 1.15rem; margin-bottom: 1rem;
-        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-      }
-      .carbon-scroll-hint {
-        font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem; font-weight: 600;
-      }
-      :root {
-        --carbon-light: #ecfdf5;
-        --carbon-mint: #86efac;
-        --carbon-gold: #fde047;
-        --carbon-orange: #fb923c;
-        --carbon-red: #dc2626;
-        --carbon-dark: #450a0a;
-        --eco-surface: #f0fdf4;
-        --baseline-surface: #fef2f2;
-        --changed-surface: #fff7ed;
-        --neutral-surface: #f8fafc;
-        --accent-green: #15803d;
-        --accent-amber: #b45309;
-        --accent-red: #991b1b;
-      }
-      .tab-intro {
-        background: linear-gradient(90deg, var(--eco-surface) 0%, var(--neutral-surface) 100%);
-        border-left: 4px solid var(--accent-green);
-        padding: 0.8rem 1.1rem; border-radius: 0 12px 12px 0;
-        font-size: 0.93rem; color: #334155; margin-bottom: 1.2rem; line-height: 1.55;
-      }
-      .carbon-chart-scroll {
-        overflow-x: auto; overflow-y: hidden;
-        border: 1px solid #cbd5e1; border-radius: 14px;
-        padding: 14px 12px 10px;
-        background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 55%, #94a3b8 100%);
-        scrollbar-width: thin;
-        scrollbar-color: var(--carbon-dark) #cbd5e1;
-      }
-      .carbon-chart-scroll::-webkit-scrollbar { height: 12px; }
-      .carbon-chart-scroll::-webkit-scrollbar-track {
-        background: linear-gradient(90deg, var(--carbon-light), #cbd5e1);
-        border-radius: 8px;
-      }
-      .carbon-chart-scroll::-webkit-scrollbar-thumb {
-        background: linear-gradient(90deg, var(--carbon-mint), var(--carbon-dark));
-        border-radius: 8px; border: 2px solid #e2e8f0;
-      }
-      .carbon-chart-inner {
-        display: flex; align-items: flex-end; gap: 10px; padding-bottom: 4px;
-      }
-      .carbon-bar-col {
-        display: flex; flex-direction: column; align-items: center; flex-shrink: 0;
-      }
-      .carbon-bar-value {
-        font-size: 0.82rem; font-weight: 700; color: #0f172a; margin-bottom: 6px;
-        white-space: nowrap;
-      }
-      .carbon-bar-wrap {
-        width: 100%; display: flex; align-items: flex-end; justify-content: center;
-        background: linear-gradient(180deg, #f1f5f9 0%, #64748b 100%);
-        border-radius: 8px 8px 4px 4px; padding: 4px 4px 0;
-        border: 1px solid #94a3b8;
-      }
-      .carbon-bar-fill {
-        width: 100%; min-height: 4px; border-radius: 6px 6px 2px 2px;
-        box-shadow: 0 3px 10px rgba(15, 23, 42, 0.25);
-        transition: height 0.25s ease;
-        border: 1px solid rgba(0,0,0,0.08);
-      }
-      .carbon-bar-region {
-        font-size: 0.72rem; font-weight: 700; color: #334155; margin-top: 8px;
-        text-align: center; line-height: 1.2; word-break: break-all;
-      }
-      .carbon-bar-label {
-        font-size: 0.65rem; color: #64748b; text-align: center; margin-top: 2px;
-      }
-      .carbon-bar-tariff {
-        font-size: 0.68rem; font-weight: 600; color: #0369a1; margin-top: 2px;
-      }
-      .bar-badge-green {
-        display: inline-block; background: #dcfce7; color: #166534;
-        font-size: 0.6rem; font-weight: 700; padding: 1px 5px; border-radius: 4px;
-        margin-top: 3px;
-      }
-      .carbon-legend {
-        margin-top: 0.75rem; font-size: 0.78rem; font-weight: 600; color: #475569;
-      }
-      .gradient-legend-bar {
-        height: 14px; border-radius: 8px; margin: 6px 0 4px;
-        background: linear-gradient(90deg,
-          #ecfdf5 0%, #86efac 18%, #fde047 40%, #fb923c 62%, #dc2626 82%, #450a0a 100%);
-        border: 1px solid #94a3b8;
-        box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
-      }
-      .gradient-legend-labels {
-        display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b;
-      }
-      .compare-arrow {
-        font-weight: 700; color: var(--accent-green); background: var(--eco-surface);
-        padding: 2px 8px; border-radius: 6px; border: 1px solid #86efac;
-      }
-      .compare-baseline {
-        color: var(--accent-red); background: var(--baseline-surface);
-        padding: 2px 6px; border-radius: 4px; font-weight: 600;
-      }
-      .compare-eco {
-        color: var(--accent-green); background: var(--eco-surface);
-        padding: 2px 6px; border-radius: 4px; font-weight: 600;
-      }
-      .compact-grid-row {
-        display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
-        font-size: 0.8rem;
-      }
-      .compact-grid-track {
-        flex: 1; height: 10px;
-        background: linear-gradient(90deg, #f1f5f9, #94a3b8);
-        border-radius: 999px; overflow: hidden; border: 1px solid #cbd5e1;
-      }
-      div[data-testid="stAlert"] {
-        border-radius: 10px !important;
-      }
-      div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #16a34a, #15803d); border: none; color: white;
-        font-weight: 700; border-radius: 12px; width: 100%;
-        box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
-      }
-      div[data-testid="stMetric"] {
-        background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-        padding: 0.65rem 0.85rem; box-shadow: 0 1px 4px rgba(15,23,42,0.05);
-      }
-      div[data-testid="stMetric"] label { font-size: 0.78rem !important; font-weight: 600 !important; color: #64748b !important; }
-      div[data-testid="stMetric"] [data-testid="stMetricValue"] { font-size: 1.15rem !important; font-weight: 700 !important; }
-      .stTabs [data-baseweb="tab"] { font-weight: 600; font-size: 0.92rem; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 
 
 def _utc_now() -> str:
@@ -401,6 +242,7 @@ def _init_session() -> None:
         "grid_chart_expanded": True,
         "carbon_bar_width": 56,
         "carbon_chart_height": 180,
+        "theme": "light",
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -583,24 +425,21 @@ def _build_dispatch_table(
     return pd.DataFrame(rows)
 
 
-def _style_assignment_overview(df: pd.DataFrame) -> Any:
+def _style_assignment_overview(df: pd.DataFrame, theme: str = "light") -> Any:
     """Color-code rows: green = improved, amber = rerouted, neutral = unchanged."""
+    palette = assignment_row_colors(theme)
 
     def _row_style(row: pd.Series) -> list[str]:
         changed = row.get("Route change", "Same") != "Same"
         carbon_delta = row.get("Carbon Δ")
         if changed and carbon_delta is not None and carbon_delta > 0:
-            bg = "#ecfdf5"
-            color = "#14532d"
+            bg, color = palette["improved"]
         elif changed:
-            bg = "#fff7ed"
-            color = "#9a3412"
+            bg, color = palette["changed"]
         elif carbon_delta is not None and carbon_delta > 0:
-            bg = "#f0fdf4"
-            color = "#166534"
+            bg, color = palette["saved"]
         else:
-            bg = "#f8fafc"
-            color = "#334155"
+            bg, color = palette["neutral"]
         style = f"background-color: {bg}; color: {color}"
         return [style] * len(row)
 
@@ -608,10 +447,10 @@ def _style_assignment_overview(df: pd.DataFrame) -> Any:
         if val is None or (isinstance(val, float) and pd.isna(val)):
             return ""
         if isinstance(val, (int, float)) and val > 0:
-            return "color: #15803d; font-weight: 700"
+            return f"color: {palette['pos']}; font-weight: 700"
         if isinstance(val, (int, float)) and val < 0:
-            return "color: #b91c1c; font-weight: 700"
-        return "color: #64748b"
+            return f"color: {palette['neg']}; font-weight: 700"
+        return f"color: {palette['zero']}"
 
     styled = df.style.apply(_row_style, axis=1)
     for col in ("Carbon Δ", "Cost Δ"):
@@ -699,6 +538,19 @@ if st.session_state.forecast is None:
 
 # --- Sidebar ---
 with st.sidebar:
+    new_theme = (
+        "dark"
+        if st.toggle(
+            "Dark mode",
+            value=st.session_state.theme == "dark",
+            help="Switch between light and dark backgrounds for charts, tables, and panels",
+        )
+        else "light"
+    )
+    if new_theme != st.session_state.theme:
+        st.session_state.theme = new_theme
+        st.rerun()
+    st.markdown("---")
     st.markdown("### ⚙️ Controls")
     cap = min(40, MAX_BATCH_JOBS)
     if st.session_state.num_jobs > cap:
@@ -779,6 +631,8 @@ with st.sidebar:
     st.session_state.carbon_chart_height = st.slider(
         "Bar height (px)", 100, 280, st.session_state.carbon_chart_height, 10,
     )
+
+st.markdown(build_theme_css(st.session_state.theme), unsafe_allow_html=True)
 
 # --- Hero ---
 st.markdown(
@@ -943,7 +797,7 @@ with tab_dash:
             "🟠 Amber = rerouted · ⬜ Gray = same as baseline"
         )
         st.dataframe(
-            _style_assignment_overview(dispatch_df),
+            _style_assignment_overview(dispatch_df, st.session_state.theme),
             use_container_width=True,
             hide_index=True,
             column_config={
