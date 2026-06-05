@@ -105,6 +105,16 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
 
 
+def _format_locality(value: str | None) -> str:
+    """Human-readable locality — None means the job can run in any region."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return "Any region"
+    text = str(value).strip()
+    if text.lower() in {"", "—", "-", "none", "null", "nan"}:
+        return "Any region"
+    return text
+
+
 def _intensity_color(value: int, max_val: int) -> str:
     ratio = value / max(max_val, 1)
     if ratio <= 0.35:
@@ -284,7 +294,7 @@ def _build_dispatch_table(
                 "Job ID": job["job_id"],
                 "Workload": job["task"],
                 "Priority": "Urgent" if job.get("is_urgent") else "Flexible",
-                "Locality": job.get("locality_constraint") or "—",
+                "Locality": _format_locality(job.get("locality_constraint")),
                 "Routed To": region,
                 "Hours": job["compute_hours"],
                 "Est. Carbon (gCO₂)": grid[region] * job["compute_hours"],
@@ -442,7 +452,7 @@ with tab_dash:
 
     st.markdown("<p class='section-title'>📋 Job Queue</p>", unsafe_allow_html=True)
     df_jobs = pd.DataFrame(jobs).copy()
-    df_jobs["locality_constraint"] = df_jobs["locality_constraint"].fillna("—")
+    df_jobs["locality_constraint"] = df_jobs["locality_constraint"].apply(_format_locality)
     df_jobs["is_urgent"] = df_jobs["is_urgent"].map({True: "Urgent", False: "Flexible"})
     df_jobs["hours_to_deadline"] = df_jobs.apply(
         lambda r: (
