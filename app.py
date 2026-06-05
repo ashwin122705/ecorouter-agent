@@ -408,6 +408,36 @@ def _render_load_distribution_chart(
     )
 
 
+def _sync_grid_session() -> None:
+    """Ensure grid/tariffs include every region (fixes stale Streamlit sessions)."""
+    if "grid_status" not in st.session_state:
+        return
+    carbon = st.session_state.grid_status or {}
+    tariffs = st.session_state.tariffs or {}
+    src = st.session_state.get("grid_source", "simulated")
+    fresh = get_grid_telemetry(source=src)
+    base_carbon = fresh["carbon_gco2_per_kwh"]
+    base_tariffs = fresh["cost_usd_per_kwh"]
+    missing = [r for r in REGIONS if r not in carbon]
+    extra = [r for r in carbon if r not in REGIONS]
+    if not missing and not extra and len(tariffs) == len(REGIONS):
+        return
+    st.session_state.grid_status = {
+        r: int(carbon.get(r, base_carbon[r])) for r in REGIONS
+    }
+    st.session_state.tariffs = {
+        r: float(tariffs.get(r, base_tariffs[r])) for r in REGIONS
+    }
+    telemetry = dict(st.session_state.get("grid_telemetry") or fresh)
+    telemetry["carbon_gco2_per_kwh"] = st.session_state.grid_status
+    telemetry["cost_usd_per_kwh"] = st.session_state.tariffs
+    telemetry["region_count"] = len(REGIONS)
+    greenest = min(st.session_state.grid_status, key=st.session_state.grid_status.get)
+    telemetry["greenest_region"] = greenest
+    telemetry["greenest_intensity"] = st.session_state.grid_status[greenest]
+    st.session_state.grid_telemetry = telemetry
+
+
 def _load_grid(source: str | None = None, fluctuate: bool = False) -> dict[str, Any]:
     src = source or st.session_state.get("grid_source", "simulated")
     if fluctuate and st.session_state.get("grid_status"):
@@ -477,6 +507,7 @@ def _init_session() -> None:
             st.session_state.user_home_region,
             st.session_state.batch_lock_region,
         )
+    _sync_grid_session()
 
 
 def _job_queue_signature() -> tuple[Any, ...]:
@@ -1300,19 +1331,19 @@ with tab_ab:
 
         c1, c2 = st.columns(2)
         with c1:
-            chart_df = pd.DataFrame({
-                comp["eco_name"]: [comp["eco_total_gco2"]],
-                comp["baseline_name"]: [comp["baseline_total_gco2"]],
-            })
+            chart_df = pd.DataFrame(
+                {"Carbon (gCO₂)": [comp["eco_total_gco2"], comp["baseline_total_gco2"]]},
+                index=[comp["eco_name"], comp["baseline_name"]],
+            )
             st.markdown("**Carbon (gCO₂)**")
-            st.bar_chart(chart_df, color=["#22c55e", "#ef4444"], height=320)
+            st.bar_chart(chart_df, height=320)
         with c2:
-            cost_df = pd.DataFrame({
-                comp["eco_name"]: [comp["eco_total_cost_usd"]],
-                comp["baseline_name"]: [comp["baseline_total_cost_usd"]],
-            })
+            cost_df = pd.DataFrame(
+                {"Cost (USD)": [comp["eco_total_cost_usd"], comp["baseline_total_cost_usd"]]},
+                index=[comp["eco_name"], comp["baseline_name"]],
+            )
             st.markdown("**Energy cost (USD)**")
-            st.bar_chart(cost_df, color=["#22c55e", "#ef4444"], height=320)
+            st.bar_chart(cost_df, height=320)
 
         merged = pd.DataFrame(comp["eco_per_job"]).merge(
             pd.DataFrame(comp["baseline_per_job"]),

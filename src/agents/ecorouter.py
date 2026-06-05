@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typing import Any
 
 # Add the root directory to the system path to allow local imports
@@ -504,6 +505,18 @@ def run_load_balanced_router(
 # ---------------------------------------------------------------------------
 
 
+def _chat_send_with_timeout(chat: Any, payload: Any, *, timeout_sec: int = 45) -> Any:
+    """Prevent the Streamlit UI from hanging indefinitely on Gemini API calls."""
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(chat.send_message, payload)
+        try:
+            return future.result(timeout=timeout_sec)
+        except FuturesTimeout as exc:
+            raise TimeoutError(
+                f"Gemini API did not respond within {timeout_sec}s"
+            ) from exc
+
+
 def run_gemini_router(
     jobs: list[dict[str, Any]],
     grid_status: dict[str, int],
@@ -536,7 +549,7 @@ def run_gemini_router(
         ),
     }
 
-    response = chat.send_message(json.dumps(user_payload, indent=2))
+    response = _chat_send_with_timeout(chat, json.dumps(user_payload, indent=2))
     assistant_final_text = ""
 
     for _ in range(max_tool_rounds):
@@ -560,7 +573,7 @@ def run_gemini_router(
                 )
             )
 
-        response = chat.send_message(response_parts)
+        response = _chat_send_with_timeout(chat, response_parts)
     else:
         assistant_final_text = _text_from_response(response)
 
@@ -706,7 +719,7 @@ def _route_jobs(
             return _with_forecast_overlay(
                 jobs, meta["assignments"], grid_status, meta, use_forecast
             )
-        except genai_errors.ClientError:
+        except (genai_errors.ClientError, genai_errors.ServerError, TimeoutError, OSError):
             assignments = apply_sla_to_assignments(jobs, run_mock_router(jobs, grid_status))
             return _with_forecast_overlay(
                 jobs, assignments, grid_status,
