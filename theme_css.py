@@ -149,37 +149,44 @@ def build_theme_css(theme: str) -> str:
         color: {t["text_muted"]} !important;
       }}
 
-      /* Big icon summary stat cards */
+      /* Big icon summary stat cards — flex to fill width, wrap when narrow */
       .stat-grid {{
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
-        gap: 12px;
+        --stat-count: 6;
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        gap: clamp(10px, 1.2vw, 16px);
         margin-bottom: 1.25rem;
       }}
       .stat-card {{
         display: flex;
         align-items: center;
-        gap: 14px;
-        padding: 14px 16px;
+        gap: clamp(10px, 1.2vw, 14px);
+        padding: clamp(12px, 1.2vw, 14px) clamp(12px, 1.4vw, 16px);
         border-radius: 14px;
         border: 1px solid {t["border"]};
         background: {t["surface"]};
         box-shadow: {t["card_shadow"]};
         min-height: 88px;
+        flex: 1 1 calc((100% - (var(--stat-count) - 1) * 12px) / var(--stat-count));
+        min-width: clamp(158px, calc((100% - (var(--stat-count) - 1) * 12px) / var(--stat-count)), 100%);
+        max-width: 100%;
+        box-sizing: border-box;
       }}
       .stat-icon-wrap {{
-        width: 56px;
-        height: 56px;
-        min-width: 56px;
+        width: clamp(48px, 5vw, 56px);
+        height: clamp(48px, 5vw, 56px);
+        min-width: clamp(48px, 5vw, 56px);
         border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.85rem;
+        font-size: clamp(1.45rem, 2.2vw, 1.85rem);
         line-height: 1;
         border: 2px solid transparent;
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28);
         filter: saturate(1.15) contrast(1.08);
+        flex-shrink: 0;
       }}
       .stat-icon-green {{
         background: {t["icon_green_bg"]};
@@ -207,7 +214,7 @@ def build_theme_css(theme: str) -> str:
       }}
       .stat-body {{ flex: 1; min-width: 0; }}
       .stat-label {{
-        font-size: 0.72rem;
+        font-size: clamp(0.65rem, 0.85vw, 0.72rem);
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.04em;
@@ -216,17 +223,18 @@ def build_theme_css(theme: str) -> str:
         line-height: 1.2;
       }}
       .stat-value {{
-        font-size: 1.45rem;
+        font-size: clamp(1.05rem, 1.6vw, 1.45rem);
         font-weight: 800;
         color: {t["text"]} !important;
         line-height: 1.15;
         word-break: break-word;
       }}
       .stat-delta {{
-        font-size: 0.78rem;
+        font-size: clamp(0.7rem, 0.9vw, 0.78rem);
         font-weight: 700;
         color: {t["accent_green"]} !important;
         margin-top: 3px;
+        line-height: 1.2;
       }}
 
       .carbon-scroll-hint {{

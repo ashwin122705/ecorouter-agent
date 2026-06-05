@@ -207,7 +207,7 @@ def _render_stat_cards(
     cards: list[tuple[str, str, str, str | None, str]],
 ) -> None:
     """Render summary metrics with large contrasting icons (icon, label, value, delta, accent)."""
-    parts: list[str] = ['<div class="stat-grid">']
+    parts: list[str] = [f'<div class="stat-grid" style="--stat-count:{len(cards)}">']
     for icon, label, value, delta, accent in cards:
         delta_html = f'<div class="stat-delta">{delta}</div>' if delta else ""
         parts.append(
