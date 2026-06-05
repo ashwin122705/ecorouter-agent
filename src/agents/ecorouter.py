@@ -14,6 +14,7 @@ from google.genai import errors as genai_errors
 from google.genai import types
 
 from sim_environment.grid_data import REGIONS, get_live_grid_status
+from sim_environment.grid_forecast import forecast_grid, recommend_deferral_window
 from sim_environment.job_queue import generate_mock_jobs
 
 load_dotenv()
@@ -221,6 +222,71 @@ def run_mock_router(
     return assignments
 
 
+def run_forecast_aware_router(
+    jobs: list[dict[str, Any]],
+    grid_status: dict[str, int],
+    min_deferral_savings_pct: float = 12.0,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """
+    Carbon-aware scheduler that uses 12h grid forecasts for flexible jobs.
+
+    Urgent jobs and locality-constrained jobs behave like the mock router.
+    Flexible jobs with no locality may defer to a greener forecast window.
+    """
+    forecast = forecast_grid(grid_status, hours_ahead=12)
+    deferral = recommend_deferral_window(grid_status, forecast, min_deferral_savings_pct)
+    greenest_now = min(grid_status, key=grid_status.get)
+    assignments: list[dict[str, Any]] = []
+
+    for job in jobs:
+        locality = job.get("locality_constraint")
+        if locality:
+            target = locality
+            reasoning = (
+                f"Locality constraint requires {locality} "
+                f"({grid_status[locality]} gCO₂/kWh)."
+            )
+            deferred = False
+            defer_hours = 0
+        elif job.get("is_urgent"):
+            target = greenest_now
+            reasoning = (
+                f"Urgent — dispatch now to greenest region {greenest_now} "
+                f"({grid_status[greenest_now]} gCO₂/kWh)."
+            )
+            deferred = False
+            defer_hours = 0
+        elif deferral["should_defer"]:
+            target = deferral["recommended_region"]
+            defer_hours = deferral["recommended_hours_ahead"]
+            reasoning = (
+                f"Flexible job deferred {defer_hours}h per forecast: {target} expected at "
+                f"{deferral['recommended_intensity']} gCO₂/kWh "
+                f"(~{deferral['estimated_savings_pct']}% vs dispatching now)."
+            )
+            deferred = True
+        else:
+            target = greenest_now
+            reasoning = (
+                f"Flexible job — no strong greener window; routing now to {greenest_now} "
+                f"({grid_status[greenest_now]} gCO₂/kWh)."
+            )
+            deferred = False
+            defer_hours = 0
+
+        assignments.append(
+            {
+                "job_id": job["job_id"],
+                "target_region": target,
+                "reasoning": reasoning,
+                "deferred": deferred,
+                "defer_hours": defer_hours,
+            }
+        )
+
+    return assignments, {"router": "forecast-aware", "forecast": forecast, "deferral": deferral}
+
+
 # ---------------------------------------------------------------------------
 # Gemini LLM — tool-calling agent
 # ---------------------------------------------------------------------------
@@ -362,16 +428,30 @@ def print_execution_summary(
 def _route_jobs(
     jobs: list[dict[str, Any]],
     grid_status: dict[str, int],
+    *,
+    mode: str = "auto",
+    use_forecast: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Route a batch via Gemini or mock heuristic; returns assignments and metadata."""
-    if _use_mock_llm():
+    """
+    Route a batch via Gemini, mock heuristic, or forecast-aware scheduler.
+
+    mode: "auto" | "mock" | "gemini" | "forecast"
+    """
+    if mode == "forecast" or use_forecast:
+        assignments, meta = run_forecast_aware_router(jobs, grid_status)
+        return assignments, meta
+
+    if mode == "mock" or (mode == "auto" and _use_mock_llm()):
         return run_mock_router(jobs, grid_status), {"router": "mock", "model": None}
 
-    try:
-        meta = run_gemini_router(jobs, grid_status)
-        return meta["assignments"], meta
-    except genai_errors.ClientError:
-        return run_mock_router(jobs, grid_status), {"router": "mock (api fallback)", "model": None}
+    if mode == "gemini" or mode == "auto":
+        try:
+            meta = run_gemini_router(jobs, grid_status)
+            return meta["assignments"], meta
+        except genai_errors.ClientError:
+            return run_mock_router(jobs, grid_status), {"router": "mock (api fallback)", "model": None}
+
+    return run_mock_router(jobs, grid_status), {"router": "mock", "model": None}
 
 
 def run_execution_loop(num_jobs: int = 5) -> dict[str, Any]:
