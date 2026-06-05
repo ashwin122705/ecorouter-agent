@@ -20,6 +20,26 @@ def baseline_reference_region(
     return job.get("locality_constraint") or default
 
 
+def composite_score(
+    region: str,
+    candidates: list[str],
+    grid_status: dict[str, int],
+    tariffs: dict[str, float],
+    carbon_weight: float = 0.6,
+    load_fraction: float = 0.0,
+    load_penalty: float = 0.12,
+) -> float:
+    """Lower is better. Optional load_fraction in [0,1] penalizes crowded regions."""
+    carbon_norm = _normalize({r: float(grid_status[r]) for r in candidates})
+    cost_norm = _normalize({r: tariffs.get(r, REGION_TARIFFS_USD[r]) for r in candidates})
+    cw = max(0.0, min(1.0, carbon_weight))
+    return (
+        cw * carbon_norm[region]
+        + (1 - cw) * cost_norm[region]
+        + load_penalty * load_fraction
+    )
+
+
 def _normalize(values: dict[str, float]) -> dict[str, float]:
     lo = min(values.values())
     hi = max(values.values())

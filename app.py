@@ -35,9 +35,16 @@ from sim_environment.carbon_metrics import (  # noqa: E402
     total_energy_cost_usd,
 )
 from sim_environment.grid_data import (  # noqa: E402
+    MAX_BATCH_JOBS,
     REGIONS,
+    REGION_GEO,
     fluctuate_grid_status,
     get_grid_telemetry,
+)
+from sim_environment.region_analytics import (  # noqa: E402
+    compute_load_distribution,
+    region_score_matrix,
+    what_if_analyze,
 )
 from sim_environment.grid_forecast import (  # noqa: E402
     forecast_grid,
@@ -196,6 +203,7 @@ def _update_forecast() -> None:
 ROUTING_MODES = [
     "pareto",
     "cost_aware",
+    "load_balanced",
     "auto",
     "mock",
     "gemini",
@@ -205,6 +213,7 @@ ROUTING_MODES = [
 ROUTING_MODE_LABELS = {
     "pareto": "Pareto (carbon ↓, cost ≤ baseline)",
     "cost_aware": "Cost-aware (weighted carbon + $)",
+    "load_balanced": "Load-balanced (spread + green)",
     "auto": "Auto (Gemini or mock)",
     "mock": "Carbon-first mock",
     "gemini": "Gemini LLM (carbon-first)",
@@ -218,7 +227,7 @@ def _run_optimization(include_baseline: bool = True) -> None:
     mode = st.session_state.routing_mode
     if (
         st.session_state.use_forecast
-        and mode not in ("cost_aware", "pareto", "forecast")
+        and mode not in ("cost_aware", "pareto", "load_balanced", "forecast")
     ):
         mode = "forecast"
 
@@ -389,7 +398,13 @@ if st.session_state.forecast is None:
 # --- Sidebar ---
 with st.sidebar:
     st.markdown("### ⚙️ Controls")
-    st.session_state.num_jobs = st.slider("Jobs per batch", 2, 8, st.session_state.num_jobs)
+    cap = min(40, MAX_BATCH_JOBS)
+    if st.session_state.num_jobs > cap:
+        st.session_state.num_jobs = cap
+    st.session_state.num_jobs = st.slider(
+        "Jobs per batch", 2, cap, st.session_state.num_jobs,
+        help=f"Simulate up to {cap} workloads per optimization run",
+    )
     if st.session_state.routing_mode not in ROUTING_MODES:
         st.session_state.routing_mode = "pareto"
     st.session_state.routing_mode = st.selectbox(
@@ -415,7 +430,7 @@ with st.sidebar:
         "Forecast-aware scheduling",
         value=st.session_state.use_forecast,
         help="Defer flexible jobs to greener forecast windows (carbon-first modes only)",
-        disabled=st.session_state.routing_mode in ("cost_aware", "pareto"),
+        disabled=st.session_state.routing_mode in ("cost_aware", "pareto", "load_balanced"),
     )
     st.session_state.baseline_type = st.radio(
         "A/B baseline",
@@ -464,7 +479,7 @@ st.markdown(
     <span class="ecorouter-pill">SLA Deadlines</span>
     <span class="ecorouter-pill">ESG Export</span>
     <span class="ecorouter-pill">Pareto Routing</span>
-    <span class="ecorouter-pill">10 Regions</span></div>""",
+    <span class="ecorouter-pill">18 Regions</span></div>""",
     unsafe_allow_html=True,
 )
 
@@ -473,9 +488,10 @@ tariffs = st.session_state.tariffs
 jobs = st.session_state.jobs
 greenest = min(grid, key=grid.get)
 
-tab_dash, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.tabs(
+tab_dash, tab_optimizer, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.tabs(
     [
         "📊 Live Dashboard",
+        "🧭 Region Optimizer",
         "📈 Forecast & Deferral",
         "⚖️ A/B Comparison",
         "🏢 Enterprise",
@@ -574,10 +590,86 @@ with tab_dash:
         st.markdown("#### Assignment overview")
         st.dataframe(dispatch_df, use_container_width=True, hide_index=True)
 
-        st.markdown("#### Per-job details")
-        _render_dispatch_cards(jobs, st.session_state.assignments, grid, greenest)
+        load_df = pd.DataFrame(compute_load_distribution(st.session_state.assignments))
+        active_load = load_df[load_df["jobs"] > 0]
+        if not active_load.empty:
+            st.markdown("#### Regional load distribution")
+            st.bar_chart(active_load.set_index("region")["jobs"], height=200)
+            st.caption(
+                f"Jobs spread across **{len(active_load)}** of {len(REGIONS)} regions."
+            )
 
-# ===================== TAB 2: FORECAST =====================
+        with st.expander("Per-job detail cards"):
+            _render_dispatch_cards(jobs, st.session_state.assignments, grid, greenest)
+
+# ===================== TAB 2: REGION OPTIMIZER =====================
+with tab_optimizer:
+    st.markdown("<p class='section-title'>🧭 Region Optimizer Tools</p>", unsafe_allow_html=True)
+    st.caption(
+        f"Explore all **{len(REGIONS)}** regions — ranked by composite carbon+cost score "
+        "and Pareto eligibility vs us-east-1 baseline."
+    )
+
+    matrix = region_score_matrix(
+        grid, tariffs, carbon_weight=st.session_state.carbon_weight
+    )
+    matrix_df = pd.DataFrame(matrix).rename(columns={
+        "region": "Region",
+        "carbon_gco2_per_kwh": "Carbon (gCO₂/kWh)",
+        "tariff_usd_per_kwh": "$/kWh",
+        "composite_score": "Score (lower=better)",
+        "pareto_vs_baseline": "Pareto vs baseline",
+        "rank": "Rank",
+        "carbon_vs_baseline_pct": "Carbon Δ%",
+        "cost_vs_baseline_pct": "Cost Δ%",
+    })
+    st.dataframe(matrix_df, use_container_width=True, hide_index=True)
+
+    geo_df = pd.DataFrame([
+        {
+            "region": r,
+            "label": REGION_GEO[r]["label"],
+            "lat": REGION_GEO[r]["lat"],
+            "lon": REGION_GEO[r]["lon"],
+            "carbon": grid[r],
+            "tariff": tariffs[r],
+        }
+        for r in REGIONS
+    ])
+    st.markdown("#### Global carbon map (bubble size = carbon intensity)")
+    st.scatter_chart(
+        geo_df,
+        x="lon",
+        y="lat",
+        size="carbon",
+        color="tariff",
+        height=360,
+    )
+
+    st.markdown("#### What-if job analyzer")
+    w1, w2, w3, w4 = st.columns(4)
+    wi_hours = w1.number_input("Compute hours", 1, 168, 12, key="wi_hours")
+    wi_urgent = w2.checkbox("Urgent", key="wi_urgent")
+    wi_locality = w3.selectbox(
+        "Locality lock",
+        ["Any region"] + REGIONS,
+        key="wi_locality",
+    )
+    wi_weight = w4.slider("Carbon weight", 0.0, 1.0, st.session_state.carbon_weight, 0.05, key="wi_weight")
+    locality_val = None if wi_locality == "Any region" else wi_locality
+    wi = what_if_analyze(
+        int(wi_hours), grid, tariffs,
+        is_urgent=wi_urgent, locality=locality_val, carbon_weight=wi_weight,
+    )
+    rec_df = pd.DataFrame([
+        {"Mode": k, **{kk: vv for kk, vv in v.items() if kk != "reasoning"}}
+        for k, v in wi["recommendations"].items()
+    ])
+    st.dataframe(rec_df, use_container_width=True, hide_index=True)
+    for mode, data in wi["recommendations"].items():
+        st.caption(f"**{mode}:** {data.get('reasoning', '')}")
+
+# ===================== TAB 3: FORECAST =====================
 with tab_forecast:
     st.markdown("<p class='section-title'>📈 12-Hour Carbon Intensity Forecast</p>", unsafe_allow_html=True)
     st.caption("Diurnal solar/wind model with mean-reversion — enables proactive scheduling.")
@@ -599,8 +691,10 @@ with tab_forecast:
 
     forecast = st.session_state.forecast or []
     df_fc = pd.DataFrame(forecast_to_dataframe(forecast))
+    top_regions = sorted(REGIONS, key=lambda r: grid[r])[:8]
+    st.caption(f"Forecast chart shows 8 greenest regions (of {len(REGIONS)} total).")
     st.line_chart(
-        df_fc.pivot_table(
+        df_fc[df_fc["Region"].isin(top_regions)].pivot_table(
             index="Hours Ahead", columns="Region", values="Carbon Intensity (gCO₂/kWh)"
         ),
         height=320,
@@ -740,7 +834,7 @@ with tab_enterprise:
             except Exception as exc:
                 st.error(f"Invalid CSV: {exc}")
 
-    st.markdown("#### Regional tariffs & carbon (10 regions)")
+    st.markdown(f"#### Regional tariffs & carbon ({len(REGIONS)} regions)")
     tariff_df = pd.DataFrame([
         {
             "Region": r,
@@ -825,9 +919,11 @@ with tab_tools:
         )
         st.markdown("""
 **Endpoints:**
+- `GET /api/v1/regions` — 18-region catalog with geo + tariffs
+- `GET /api/v1/regions/matrix?carbon_weight=0.6` — ranked optimizer matrix
+- `POST /api/v1/analyze?compute_hours=12&mode=pareto` — what-if job analyzer
 - `GET /api/v1/grid?source=live` — carbon + $/kWh tariffs
-- `GET /api/v1/forecast?hours=12&source=simulated` — forecast + deferral
-- `POST /api/v1/optimize?num_jobs=4&mode=pareto` — Pareto / cost-aware optimizer
+- `POST /api/v1/optimize?num_jobs=24&mode=load_balanced` — batch optimizer (up to 50)
 - `POST /api/v1/jobs` — BYO job queue (JSON body)
 - `GET /api/v1/compare?baseline=static` — A/B carbon + cost analysis
         """)

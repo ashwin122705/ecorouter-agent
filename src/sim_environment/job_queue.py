@@ -73,10 +73,9 @@ def generate_mock_jobs(num_jobs: int = 5) -> list[dict[str, Any]]:
                     "task": random.choice(JOB_TYPES),
                     "compute_hours": random.randint(1, 24),
                     "is_urgent": is_urgent,
-                    "locality_constraint": random.choice([
-                        None, "eu-central-1", "us-east-1", "eu-west-1",
-                        "ap-northeast-1", None, None,
-                    ]),
+                    "locality_constraint": random.choice(
+                        [None] * 6 + random.sample(REGIONS, k=min(6, len(REGIONS)))
+                    ),
                     "deadline_utc": _default_deadline(6 if is_urgent else random.randint(24, 96)),
                 },
                 index=i,

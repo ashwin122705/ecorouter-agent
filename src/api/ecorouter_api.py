@@ -15,7 +15,8 @@ from sim_environment.baseline_scheduler import (
     run_static_default_scheduler,
 )
 from sim_environment.carbon_metrics import compare_schedulers
-from sim_environment.grid_data import get_grid_telemetry
+from sim_environment.grid_data import get_grid_telemetry, get_regions_catalog
+from sim_environment.region_analytics import region_score_matrix, what_if_analyze
 from sim_environment.grid_forecast import forecast_grid, recommend_deferral_window
 from sim_environment.job_queue import (
     generate_mock_jobs,
@@ -27,6 +28,42 @@ from sim_environment.job_queue import (
 
 def _resolve_grid(source: str = "simulated") -> dict[str, Any]:
     return get_grid_telemetry(source=source)
+
+
+def list_regions() -> dict[str, Any]:
+    return {"regions": get_regions_catalog(), "count": len(get_regions_catalog())}
+
+
+def get_region_matrix(
+    source: str = "simulated",
+    carbon_weight: float = 0.6,
+) -> dict[str, Any]:
+    telemetry = _resolve_grid(source)
+    carbon = telemetry["carbon_gco2_per_kwh"]
+    tariffs = telemetry["cost_usd_per_kwh"]
+    return {
+        "matrix": region_score_matrix(carbon, tariffs, carbon_weight=carbon_weight),
+        "grid_status": carbon,
+        "cost_usd_per_kwh": tariffs,
+    }
+
+
+def analyze_job(
+    compute_hours: int = 8,
+    is_urgent: bool = False,
+    locality: str | None = None,
+    source: str = "simulated",
+    carbon_weight: float = 0.6,
+) -> dict[str, Any]:
+    telemetry = _resolve_grid(source)
+    return what_if_analyze(
+        compute_hours,
+        telemetry["carbon_gco2_per_kwh"],
+        telemetry["cost_usd_per_kwh"],
+        is_urgent=is_urgent,
+        locality=locality,
+        carbon_weight=carbon_weight,
+    )
 
 
 def get_status(source: str = "simulated") -> dict[str, Any]:

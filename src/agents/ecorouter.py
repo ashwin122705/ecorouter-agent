@@ -25,6 +25,7 @@ from sim_environment.job_queue import generate_mock_jobs
 from sim_environment.routing_scores import (
     allowed_regions,
     baseline_reference_region,
+    composite_score,
     select_cost_aware_region,
     select_pareto_region,
 )
@@ -384,6 +385,59 @@ def run_pareto_router(
     return assignments
 
 
+def run_load_balanced_router(
+    jobs: list[dict[str, Any]],
+    grid_status: dict[str, int],
+    tariffs: dict[str, float] | None = None,
+    carbon_weight: float = 0.55,
+    load_penalty: float = 0.12,
+) -> list[dict[str, Any]]:
+    """
+    Spread jobs across green regions to avoid hotspotting a single data center.
+    Processes largest jobs first and penalizes regions already assigned workloads.
+    """
+    tariffs = tariffs or REGION_TARIFFS_USD
+    region_load: dict[str, int] = {r: 0 for r in REGIONS}
+    assignments: list[dict[str, Any]] = []
+    sorted_jobs = sorted(jobs, key=lambda j: j.get("compute_hours", 0), reverse=True)
+    max_load = max(len(jobs), 1)
+
+    for job in sorted_jobs:
+        candidates = allowed_regions(job)
+        if len(candidates) == 1:
+            target = candidates[0]
+            reasoning = f"Locality locked to {target}."
+        else:
+            target = min(
+                candidates,
+                key=lambda r: composite_score(
+                    r,
+                    candidates,
+                    grid_status,
+                    tariffs,
+                    carbon_weight=carbon_weight,
+                    load_fraction=region_load[r] / max_load,
+                    load_penalty=load_penalty,
+                ),
+            )
+            reasoning = (
+                f"Load-balanced: {target} (assigned={region_load[target]}, "
+                f"{grid_status[target]} gCO₂/kWh, ${tariffs.get(target, 0):.3f}/kWh)."
+            )
+
+        region_load[target] += 1
+        assignments.append(
+            {
+                "job_id": job["job_id"],
+                "target_region": target,
+                "reasoning": reasoning,
+                "routing_objective": "load_balanced",
+            }
+        )
+
+    return assignments
+
+
 # ---------------------------------------------------------------------------
 # Gemini LLM — tool-calling agent
 # ---------------------------------------------------------------------------
@@ -534,9 +588,18 @@ def _route_jobs(
     """
     Route a batch via Gemini, mock heuristic, forecast, cost-aware, or Pareto.
 
-    mode: "auto" | "mock" | "gemini" | "forecast" | "cost_aware" | "pareto"
+    mode: "auto" | "mock" | "gemini" | "forecast" | "cost_aware" | "pareto" | "load_balanced"
     """
     tariffs = tariffs or REGION_TARIFFS_USD
+
+    if mode == "load_balanced":
+        assignments = apply_sla_to_assignments(
+            jobs,
+            run_load_balanced_router(
+                jobs, grid_status, tariffs, carbon_weight=carbon_weight
+            ),
+        )
+        return assignments, {"router": "load-balanced", "model": None}
 
     if mode == "cost_aware":
         assignments = apply_sla_to_assignments(
