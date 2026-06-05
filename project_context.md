@@ -17,10 +17,10 @@
 | Problem & Insight (3 pts) | AI electricity + regional grid variance; agent replaces manual scheduling |
 | Execution & Technical Work (5 pts) | Full stack: grid sim, job queue, Gemini tool-calling, routers, Streamlit, FastAPI, CLI |
 | Evaluation & Evidence (3 pts) | A/B comparison vs baseline, constraint checks, iteration log, documented limitations |
-| Communication & Presentation (2 pts) | README, TA guide, teleprompter, reproducible quick start |
+| Communication & Presentation (2 pts) | README, TA guide, reproducible quick start |
 | Process & Disclosure (2 pts) | Cursor/Gemini AI disclosure, original code, public GitHub history |
 
-**Video Q1–Q4** covered in `docs/EcoRouter_Teleprompter_v2_Script.md`.
+**Video Q1–Q4** covered in the demo video and README rubric section.
 
 ## 3. Technical Architecture
 
@@ -41,9 +41,7 @@ ecorouter-agent/
 ├── requirements.txt
 ├── README.md                   # Rubric alignment + quick start
 ├── docs/
-│   ├── TA_Access_Guide.md
-│   ├── EcoRouter_Teleprompter_v2_Script.md
-│   └── EcoRouter_Teleprompter_v2.pdf
+│   └── TA_Access_Guide.md
 └── src/
     ├── agents/ecorouter.py
     ├── api/server.py

@@ -8,7 +8,7 @@
 | **Track** | Automation / Agent Systems |
 | **Repository** | https://github.com/ashwin122705/ecorouter-agent |
 | **Live demo** | Deploy via [Streamlit Cloud](https://share.streamlit.io) — see [TA Access Guide](docs/TA_Access_Guide.md) |
-| **Video script (≤6 min)** | [PDF teleprompter](docs/EcoRouter_Teleprompter_v2.pdf) · [Script](docs/EcoRouter_Teleprompter_v2_Script.md) · [HTML](docs/EcoRouter_Teleprompter_v2.html) |
+| **Demo video** | ≤10 min · covers rubric + Q1–Q4 (submit via Canvas) |
 
 EcoRouter is an autonomous **carbon-aware AI workload orchestration agent**. It reads live (or simulated) grid telemetry across **30 AWS regions**, routes enterprise AI jobs to greener datacenters, respects SLA deadlines and compliance locality locks, and quantifies savings versus naive baselines — all through an interactive dashboard, REST API, and LLM tool-calling brain.
 
@@ -112,7 +112,7 @@ ecorouter-agent/
 ├── theme_css.py                # Dark-theme UI styles
 ├── requirements.txt
 ├── .streamlit/config.toml      # Streamlit Cloud theme
-├── docs/                       # Teleprompter, TA guide
+├── docs/                       # TA guide
 └── src/
     ├── agents/ecorouter.py     # LLM tool-calling + all routing engines
     ├── api/server.py           # FastAPI REST layer
@@ -191,7 +191,7 @@ See **[docs/TA_Access_Guide.md](docs/TA_Access_Guide.md)** for:
 | Problem & Insight (3 pts) | README below · Video **Q1** · Live Dashboard problem framing |
 | Execution & Technical Work (5 pts) | README + architecture · Video **Q2** · Full app + API + CLI |
 | Evaluation & Evidence (3 pts) | A/B Comparison tab · constraint checks · iteration log below |
-| Communication & Presentation (2 pts) | This README · [TA Access Guide](docs/TA_Access_Guide.md) · demo video · teleprompter |
+| Communication & Presentation (2 pts) | This README · [TA Access Guide](docs/TA_Access_Guide.md) · demo video |
 | Process, Integrity & Disclosure (2 pts) | AI disclosure below · public GitHub · limitations below |
 
 ### Video requirements mapping (demo ≤ 10 min; script targets ~6 min)
@@ -202,8 +202,6 @@ See **[docs/TA_Access_Guide.md](docs/TA_Access_Guide.md)** for:
 | **Q2: How does the product work?** | Execution (Agent Systems) | Grid sim → job queue → Gemini tool-calling agent → Pareto/forecast routers → dashboard + API |
 | **Q3: Use cases & societal impact?** | Use Cases | Cloud/AI labs, FinOps, DePIN — Scope 2 reduction without breaking SLAs |
 | **Q4: What more would you add?** | Future Work | K8s operator, RL over forecasts, per-tenant carbon budgets |
-
-Teleprompter: [PDF](docs/EcoRouter_Teleprompter_v2.pdf) · [Markdown](docs/EcoRouter_Teleprompter_v2_Script.md)
 
 ---
 
@@ -252,7 +250,7 @@ Graders: **Live Dashboard → Run Optimization → A/B Comparison** tab for quan
 
 - **README** (this file): problem, architecture, quick start, API, rubric alignment
 - **TA Access Guide:** 3-minute grading path, Streamlit Cloud deploy, troubleshooting
-- **Demo video:** Structured walkthrough covering Q1–Q4 (see teleprompter)
+- **Demo video:** Structured walkthrough covering Q1–Q4
 - **In-app clarity:** Six labeled tabs, sidebar controls, color-coded assignment table, gCO₂ units on stat cards
 - **Engagement:** Interactive optimization — not a static recording of fake output
 
@@ -273,7 +271,7 @@ All simulation logic, routing algorithms (Pareto, forecast overlay, load-spreadi
 - Carbon figures are illustrative unless live Electricity Maps key is configured
 - Peer-scale production hardening (auth, multi-tenant isolation) out of scope for 10-week sprint
 
-**Public artifacts:** Open GitHub repo, commit history, `docs/` folder (teleprompter, TA guide), session export JSON/CSV in app.
+**Public artifacts:** Open GitHub repo, commit history, `docs/` folder (TA guide), session export JSON/CSV in app.
 
 ---
 

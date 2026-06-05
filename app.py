@@ -1553,8 +1553,6 @@ with tab_tools:
 4. **What more?** — K8s operator, RL forecasts, per-tenant carbon budgets
 
 **Grading path:** Live Dashboard → **Run EcoRouter Optimization** → **A/B Comparison** → verify gCO₂ savings.
-
-**Teleprompter PDF:** `docs/EcoRouter_Teleprompter_v2.pdf` in the repo.
         """)
 
     st.markdown("#### Cloudflare edge (roadmap)")
