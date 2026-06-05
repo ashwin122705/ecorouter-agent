@@ -13,9 +13,21 @@ from google import genai
 from google.genai import errors as genai_errors
 from google.genai import types
 
-from sim_environment.grid_data import REGIONS, get_grid_telemetry, get_live_grid_status
+from sim_environment.grid_data import (
+    DEFAULT_BASELINE_REGION,
+    REGIONS,
+    REGION_TARIFFS_USD,
+    get_grid_telemetry,
+    get_live_grid_status,
+)
 from sim_environment.grid_forecast import forecast_grid, recommend_deferral_window
 from sim_environment.job_queue import generate_mock_jobs
+from sim_environment.routing_scores import (
+    allowed_regions,
+    baseline_reference_region,
+    select_cost_aware_region,
+    select_pareto_region,
+)
 from sim_environment.sla import apply_sla_to_assignments, can_defer
 
 load_dotenv()
@@ -298,6 +310,80 @@ def run_forecast_aware_router(
     return assignments, {"router": "forecast-aware", "forecast": forecast, "deferral": deferral}
 
 
+def run_cost_aware_router(
+    jobs: list[dict[str, Any]],
+    grid_status: dict[str, int],
+    tariffs: dict[str, float] | None = None,
+    carbon_weight: float = 0.6,
+) -> list[dict[str, Any]]:
+    """Balance carbon and $/kWh using a configurable weighted score."""
+    tariffs = tariffs or REGION_TARIFFS_USD
+    assignments: list[dict[str, Any]] = []
+
+    for job in jobs:
+        candidates = allowed_regions(job)
+        if len(candidates) == 1:
+            target = candidates[0]
+            reasoning = (
+                f"Locality locked to {target} "
+                f"({grid_status[target]} gCO₂/kWh, ${tariffs.get(target, 0):.3f}/kWh)."
+            )
+        else:
+            target, reasoning = select_cost_aware_region(
+                candidates, grid_status, tariffs, carbon_weight=carbon_weight
+            )
+
+        assignments.append(
+            {
+                "job_id": job["job_id"],
+                "target_region": target,
+                "reasoning": reasoning,
+                "routing_objective": "cost_aware",
+            }
+        )
+
+    return assignments
+
+
+def run_pareto_router(
+    jobs: list[dict[str, Any]],
+    grid_status: dict[str, int],
+    tariffs: dict[str, float] | None = None,
+    baseline_region: str = DEFAULT_BASELINE_REGION,
+) -> list[dict[str, Any]]:
+    """
+    Route to regions that improve carbon vs baseline without increasing cost.
+    Falls back to cost-aware when no Pareto-optimal option exists.
+    """
+    tariffs = tariffs or REGION_TARIFFS_USD
+    assignments: list[dict[str, Any]] = []
+
+    for job in jobs:
+        candidates = allowed_regions(job)
+        ref = baseline_reference_region(job, baseline_region)
+
+        if len(candidates) == 1:
+            target = candidates[0]
+            reasoning = f"Locality locked to {target}."
+            tier = "locality_locked"
+        else:
+            target, reasoning, tier = select_pareto_region(
+                candidates, grid_status, tariffs, reference_region=ref
+            )
+
+        assignments.append(
+            {
+                "job_id": job["job_id"],
+                "target_region": target,
+                "reasoning": reasoning,
+                "routing_objective": "pareto",
+                "pareto_tier": tier,
+            }
+        )
+
+    return assignments
+
+
 # ---------------------------------------------------------------------------
 # Gemini LLM — tool-calling agent
 # ---------------------------------------------------------------------------
@@ -442,12 +528,32 @@ def _route_jobs(
     *,
     mode: str = "auto",
     use_forecast: bool = False,
+    tariffs: dict[str, float] | None = None,
+    carbon_weight: float = 0.6,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """
-    Route a batch via Gemini, mock heuristic, or forecast-aware scheduler.
+    Route a batch via Gemini, mock heuristic, forecast, cost-aware, or Pareto.
 
-    mode: "auto" | "mock" | "gemini" | "forecast"
+    mode: "auto" | "mock" | "gemini" | "forecast" | "cost_aware" | "pareto"
     """
+    tariffs = tariffs or REGION_TARIFFS_USD
+
+    if mode == "cost_aware":
+        assignments = apply_sla_to_assignments(
+            jobs, run_cost_aware_router(jobs, grid_status, tariffs, carbon_weight)
+        )
+        return assignments, {
+            "router": "cost-aware",
+            "carbon_weight": carbon_weight,
+            "model": None,
+        }
+
+    if mode == "pareto":
+        assignments = apply_sla_to_assignments(
+            jobs, run_pareto_router(jobs, grid_status, tariffs)
+        )
+        return assignments, {"router": "pareto", "model": None}
+
     if mode == "forecast" or use_forecast:
         assignments, meta = run_forecast_aware_router(jobs, grid_status)
         assignments = apply_sla_to_assignments(jobs, assignments)
@@ -455,7 +561,7 @@ def _route_jobs(
 
     if mode == "mock" or (mode == "auto" and _use_mock_llm()):
         assignments = apply_sla_to_assignments(jobs, run_mock_router(jobs, grid_status))
-        return assignments, {"router": "mock", "model": None}
+        return assignments, {"router": "carbon-first (mock)", "model": None}
 
     if mode == "gemini" or mode == "auto":
         try:

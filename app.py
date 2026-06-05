@@ -154,7 +154,8 @@ def _init_session() -> None:
         "model": None,
         "optimized": False,
         "num_jobs": 4,
-        "routing_mode": "auto",
+        "routing_mode": "pareto",
+        "carbon_weight": 0.6,
         "use_forecast": False,
         "baseline_type": "static",
         "forecast": None,
@@ -192,13 +193,44 @@ def _update_forecast() -> None:
     )
 
 
+ROUTING_MODES = [
+    "pareto",
+    "cost_aware",
+    "auto",
+    "mock",
+    "gemini",
+    "forecast",
+]
+
+ROUTING_MODE_LABELS = {
+    "pareto": "Pareto (carbon ↓, cost ≤ baseline)",
+    "cost_aware": "Cost-aware (weighted carbon + $)",
+    "auto": "Auto (Gemini or mock)",
+    "mock": "Carbon-first mock",
+    "gemini": "Gemini LLM (carbon-first)",
+    "forecast": "Forecast deferral (carbon-first)",
+}
+
+
 def _run_optimization(include_baseline: bool = True) -> None:
     jobs = st.session_state.jobs
     grid = st.session_state.grid_status
-    mode = "forecast" if st.session_state.use_forecast else st.session_state.routing_mode
+    mode = st.session_state.routing_mode
+    if (
+        st.session_state.use_forecast
+        and mode not in ("cost_aware", "pareto", "forecast")
+    ):
+        mode = "forecast"
 
     with contextlib.redirect_stdout(io.StringIO()):
-        assignments, meta = _route_jobs(jobs, grid, mode=mode, use_forecast=st.session_state.use_forecast)
+        assignments, meta = _route_jobs(
+            jobs,
+            grid,
+            mode=mode,
+            use_forecast=st.session_state.use_forecast,
+            tariffs=st.session_state.tariffs,
+            carbon_weight=st.session_state.carbon_weight,
+        )
 
     st.session_state.assignments = assignments
     st.session_state.router = meta.get("router", "unknown")
@@ -358,16 +390,32 @@ if st.session_state.forecast is None:
 with st.sidebar:
     st.markdown("### ⚙️ Controls")
     st.session_state.num_jobs = st.slider("Jobs per batch", 2, 8, st.session_state.num_jobs)
+    if st.session_state.routing_mode not in ROUTING_MODES:
+        st.session_state.routing_mode = "pareto"
     st.session_state.routing_mode = st.selectbox(
         "Routing engine",
-        ["auto", "mock", "gemini", "forecast"],
-        index=["auto", "mock", "gemini", "forecast"].index(st.session_state.routing_mode),
-        help="auto = Gemini if API key present, else mock",
+        ROUTING_MODES,
+        index=ROUTING_MODES.index(st.session_state.routing_mode),
+        format_func=lambda m: ROUTING_MODE_LABELS.get(m, m),
+        help=(
+            "Pareto: lower carbon without raising $/kWh vs baseline. "
+            "Cost-aware: tune carbon vs cost with the slider below."
+        ),
     )
+    if st.session_state.routing_mode == "cost_aware":
+        st.session_state.carbon_weight = st.slider(
+            "Carbon vs cost weight",
+            0.0,
+            1.0,
+            st.session_state.carbon_weight,
+            0.05,
+            help="1.0 = carbon only, 0.0 = cost only",
+        )
     st.session_state.use_forecast = st.toggle(
         "Forecast-aware scheduling",
         value=st.session_state.use_forecast,
-        help="Defer flexible jobs to greener forecast windows",
+        help="Defer flexible jobs to greener forecast windows (carbon-first modes only)",
+        disabled=st.session_state.routing_mode in ("cost_aware", "pareto"),
     )
     st.session_state.baseline_type = st.radio(
         "A/B baseline",
@@ -414,7 +462,9 @@ st.markdown(
     <span class="ecorouter-pill">REST API</span>
     <span class="ecorouter-pill">FinOps $/kWh</span>
     <span class="ecorouter-pill">SLA Deadlines</span>
-    <span class="ecorouter-pill">ESG Export</span></div>""",
+    <span class="ecorouter-pill">ESG Export</span>
+    <span class="ecorouter-pill">Pareto Routing</span>
+    <span class="ecorouter-pill">10 Regions</span></div>""",
     unsafe_allow_html=True,
 )
 
@@ -435,12 +485,14 @@ tab_dash, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.tabs(
 
 # ===================== TAB 1: DASHBOARD =====================
 with tab_dash:
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Greenest Region", greenest)
-    m2.metric("Intensity", f"{grid[greenest]} gCO₂/kWh")
-    m3.metric("Tariff", f"${tariffs[greenest]:.3f}/kWh")
+    cheapest = min(tariffs, key=tariffs.get)
+    m1, m2, m3, m4, m5, m6 = st.columns(6)
+    m1.metric("Regions", len(REGIONS))
+    m2.metric("Greenest", f"{greenest} ({grid[greenest]})")
+    m3.metric("Cheapest", f"{cheapest} (${tariffs[cheapest]:.3f})")
     m4.metric("Pending Jobs", len(jobs))
-    m5.metric("Data Source", st.session_state.grid_telemetry.get("source", "simulated"))
+    m5.metric("Routing", ROUTING_MODE_LABELS.get(st.session_state.routing_mode, "—"))
+    m6.metric("Grid Source", st.session_state.grid_telemetry.get("source", "simulated")[:12])
 
     c1, c2 = st.columns([1.1, 0.9])
     with c1:
@@ -449,6 +501,12 @@ with tab_dash:
         st.bar_chart(df_grid.set_index("Region"), color="#22c55e", height=260)
     with c2:
         st.markdown(_grid_bars_html(grid), unsafe_allow_html=True)
+
+    st.info(
+        "**Routing modes:** *Carbon-first* (mock/Gemini/forecast) minimizes gCO₂ and may "
+        "increase cost when greener regions have higher tariffs. **Pareto** and **Cost-aware** "
+        "balance sustainability with FinOps — recommended for production pilots."
+    )
 
     st.markdown("<p class='section-title'>📋 Job Queue</p>", unsafe_allow_html=True)
     df_jobs = pd.DataFrame(jobs).copy()
@@ -501,6 +559,13 @@ with tab_dash:
                 f"${comp['cost_saved_usd']:.2f}",
                 f"{comp['cost_savings_pct']}%",
             )
+            tradeoff = comp.get("tradeoff_type", "")
+            if tradeoff == "win_win":
+                st.success(comp.get("tradeoff_message", ""))
+            elif tradeoff == "carbon_tradeoff":
+                st.warning(comp.get("tradeoff_message", ""))
+            elif comp.get("tradeoff_message"):
+                st.info(comp.get("tradeoff_message", ""))
         st.caption(f"Engine: **{st.session_state.router}**")
 
         dispatch_df = _build_dispatch_table(
@@ -577,6 +642,14 @@ with tab_ab:
             f"{comp['cost_savings_pct']}%",
         )
 
+        tradeoff = comp.get("tradeoff_type", "")
+        if tradeoff == "win_win":
+            st.success(comp.get("tradeoff_message", ""))
+        elif tradeoff == "carbon_tradeoff":
+            st.warning(comp.get("tradeoff_message", ""))
+        elif comp.get("tradeoff_message"):
+            st.info(comp.get("tradeoff_message", ""))
+
         c1, c2 = st.columns(2)
         with c1:
             chart_df = pd.DataFrame({
@@ -614,13 +687,18 @@ with tab_ab:
             hide_index=True,
         )
 
-        if comp["savings_pct"] > 0 or comp["cost_savings_pct"] > 0:
-            st.success(
-                f"EcoRouter saved **{comp['carbon_saved_gco2']:,} gCO₂** ({comp['savings_pct']}%) "
-                f"and **${comp['cost_saved_usd']:.2f}** ({comp['cost_savings_pct']}%) "
-                f"vs {comp['baseline_name']}."
+        if tradeoff == "win_win":
+            st.markdown(
+                f"**Summary:** {comp['carbon_saved_gco2']:,} gCO₂ and "
+                f"${comp['cost_saved_usd']:.2f} saved vs {comp['baseline_name']}."
             )
-        else:
+        elif tradeoff == "carbon_tradeoff":
+            st.markdown(
+                f"**Summary:** {comp['carbon_saved_gco2']:,} gCO₂ saved, but energy cost "
+                f"increased by **${abs(comp['cost_saved_usd']):.2f}**. "
+                "Switch to **Pareto** or **Cost-aware** routing to avoid this."
+            )
+        elif comp["savings_pct"] <= 0 and comp["cost_savings_pct"] <= 0:
             st.warning("Baseline matched EcoRouter — likely all jobs had locality constraints.")
 
 # ===================== TAB 4: ENTERPRISE =====================
@@ -662,9 +740,18 @@ with tab_enterprise:
             except Exception as exc:
                 st.error(f"Invalid CSV: {exc}")
 
-    st.markdown("#### Regional tariffs (USD/kWh)")
+    st.markdown("#### Regional tariffs & carbon (10 regions)")
     tariff_df = pd.DataFrame([
-        {"Region": r, "USD/kWh": tariffs[r], "Carbon (gCO₂/kWh)": grid[r]}
+        {
+            "Region": r,
+            "USD/kWh": tariffs[r],
+            "Carbon (gCO₂/kWh)": grid[r],
+            "Pareto vs us-east-1": (
+                "✓ strict"
+                if grid[r] < grid["us-east-1"] and tariffs[r] <= tariffs["us-east-1"]
+                else ("~ carbon only" if grid[r] < grid["us-east-1"] else "—")
+            ),
+        }
         for r in REGIONS
     ])
     st.dataframe(tariff_df, use_container_width=True, hide_index=True)
@@ -740,7 +827,7 @@ with tab_tools:
 **Endpoints:**
 - `GET /api/v1/grid?source=live` — carbon + $/kWh tariffs
 - `GET /api/v1/forecast?hours=12&source=simulated` — forecast + deferral
-- `POST /api/v1/optimize?num_jobs=4&mode=forecast` — run optimizer
+- `POST /api/v1/optimize?num_jobs=4&mode=pareto` — Pareto / cost-aware optimizer
 - `POST /api/v1/jobs` — BYO job queue (JSON body)
 - `GET /api/v1/compare?baseline=static` — A/B carbon + cost analysis
         """)

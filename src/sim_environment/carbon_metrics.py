@@ -107,6 +107,8 @@ def compare_schedulers(
     cost_saved = round(baseline_cost - eco_cost, 2)
     cost_pct = (cost_saved / baseline_cost * 100) if baseline_cost > 0 else 0.0
 
+    tradeoff = _classify_tradeoff(carbon_saved, cost_saved)
+
     return {
         "eco_name": eco_name,
         "baseline_name": baseline_name,
@@ -118,6 +120,46 @@ def compare_schedulers(
         "baseline_total_cost_usd": baseline_cost,
         "cost_saved_usd": cost_saved,
         "cost_savings_pct": round(cost_pct, 1),
+        "tradeoff_type": tradeoff["type"],
+        "tradeoff_message": tradeoff["message"],
         "eco_per_job": per_job_breakdown(jobs, grid_status, eco_assignments, eco_name, tariffs),
         "baseline_per_job": per_job_breakdown(jobs, grid_status, baseline_assignments, baseline_name, tariffs),
+    }
+
+
+def _classify_tradeoff(carbon_saved: int, cost_saved: float) -> dict[str, str]:
+    """Label carbon vs cost outcome for dashboard messaging."""
+    if carbon_saved > 0 and cost_saved > 0:
+        return {
+            "type": "win_win",
+            "message": (
+                "Win-win: EcoRouter reduced both carbon and energy cost vs baseline. "
+                "This is the ideal outcome for ESG and FinOps teams."
+            ),
+        }
+    if carbon_saved > 0 and cost_saved < 0:
+        return {
+            "type": "carbon_tradeoff",
+            "message": (
+                "Carbon-first tradeoff: emissions fell but energy cost increased because "
+                "greener regions (e.g. EU) can have higher $/kWh than the baseline default. "
+                "Try **Pareto** or **Cost-aware** routing to balance both objectives."
+            ),
+        }
+    if carbon_saved > 0 and cost_saved == 0:
+        return {
+            "type": "carbon_neutral_cost",
+            "message": "Carbon improved with no net cost change vs baseline.",
+        }
+    if carbon_saved <= 0 and cost_saved > 0:
+        return {
+            "type": "cost_only",
+            "message": "Cost improved; carbon matched or increased (often due to locality locks).",
+        }
+    return {
+        "type": "no_gain",
+        "message": (
+            "No net savings — likely all jobs had locality constraints or baseline "
+            "already matched the routing policy."
+        ),
     }

@@ -61,20 +61,30 @@ def optimize_jobs(
     use_forecast: bool = False,
     source: str = "simulated",
     jobs: list[dict[str, Any]] | None = None,
+    carbon_weight: float = 0.6,
 ) -> dict[str, Any]:
     telemetry = _resolve_grid(source)
     carbon = telemetry["carbon_gco2_per_kwh"]
+    tariffs = telemetry["cost_usd_per_kwh"]
     queue = jobs if jobs is not None else generate_mock_jobs(num_jobs=num_jobs)
-    assignments, meta = _route_jobs(queue, carbon, mode=mode, use_forecast=use_forecast)
+    assignments, meta = _route_jobs(
+        queue,
+        carbon,
+        mode=mode,
+        use_forecast=use_forecast,
+        tariffs=tariffs,
+        carbon_weight=carbon_weight,
+    )
     return {
         "jobs": queue,
         "grid_status": carbon,
-        "cost_usd_per_kwh": telemetry["cost_usd_per_kwh"],
+        "cost_usd_per_kwh": tariffs,
         "data_source": telemetry["source"],
         "assignments": assignments,
         "router": meta.get("router"),
         "model": meta.get("model"),
         "deferral": meta.get("deferral"),
+        "carbon_weight": meta.get("carbon_weight"),
     }
 
 
@@ -95,6 +105,7 @@ def submit_custom_jobs(
         use_forecast=use_forecast,
         source=source,
         jobs=jobs,
+        carbon_weight=float(payload.get("carbon_weight", 0.6)),
     )
 
 
@@ -118,7 +129,9 @@ def compare_baseline(
     carbon = telemetry["carbon_gco2_per_kwh"]
     tariffs = telemetry["cost_usd_per_kwh"]
     queue = jobs if jobs is not None else generate_mock_jobs(num_jobs=num_jobs)
-    eco_assignments, eco_meta = _route_jobs(queue, carbon, mode=mode)
+    eco_assignments, eco_meta = _route_jobs(
+        queue, carbon, mode=mode, tariffs=tariffs
+    )
 
     if baseline == "round_robin":
         baseline_assignments = run_round_robin_scheduler(queue, carbon)

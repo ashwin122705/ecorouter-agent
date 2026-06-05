@@ -44,6 +44,7 @@ class JobsRequest(BaseModel):
     mode: str = "auto"
     use_forecast: bool = False
     grid_source: str = "simulated"
+    carbon_weight: float = Field(0.6, ge=0.0, le=1.0)
 
 
 @app.get("/health")
@@ -69,15 +70,20 @@ def grid_forecast(
 @app.post("/api/v1/optimize")
 def optimize(
     num_jobs: int = Query(4, ge=1, le=20),
-    mode: str = Query("auto", pattern="^(auto|mock|gemini|forecast)$"),
+    mode: str = Query(
+        "auto",
+        pattern="^(auto|mock|gemini|forecast|cost_aware|pareto)$",
+    ),
     use_forecast: bool = Query(False),
     source: str = Query("simulated", pattern="^(simulated|live)$"),
+    carbon_weight: float = Query(0.6, ge=0.0, le=1.0),
 ) -> dict[str, Any]:
     return optimize_jobs(
         num_jobs=num_jobs,
         mode=mode,
         use_forecast=use_forecast or mode == "forecast",
         source=source,
+        carbon_weight=carbon_weight,
     )
 
 
@@ -86,7 +92,10 @@ def route_custom_jobs(body: JobsRequest) -> dict[str, Any]:
     """Submit a custom job queue (BYO) for carbon-aware routing."""
     try:
         return submit_custom_jobs(
-            payload=body.model_dump(),
+            payload={
+                **body.model_dump(),
+                "carbon_weight": body.carbon_weight,
+            },
             mode=body.mode,
             use_forecast=body.use_forecast,
             source=body.grid_source,
@@ -99,7 +108,10 @@ def route_custom_jobs(body: JobsRequest) -> dict[str, Any]:
 def compare(
     num_jobs: int = Query(4, ge=1, le=20),
     baseline: str = Query("static", pattern="^(static|round_robin)$"),
-    mode: str = Query("auto", pattern="^(auto|mock|gemini|forecast)$"),
+    mode: str = Query(
+        "auto",
+        pattern="^(auto|mock|gemini|forecast|cost_aware|pareto)$",
+    ),
     source: str = Query("simulated", pattern="^(simulated|live)$"),
 ) -> dict[str, Any]:
     return compare_baseline(
