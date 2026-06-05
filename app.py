@@ -94,15 +94,43 @@ st.markdown(
       .carbon-scroll-hint {
         font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem; font-weight: 600;
       }
+      :root {
+        --carbon-light: #ecfdf5;
+        --carbon-mint: #86efac;
+        --carbon-gold: #fde047;
+        --carbon-orange: #fb923c;
+        --carbon-red: #dc2626;
+        --carbon-dark: #450a0a;
+        --eco-surface: #f0fdf4;
+        --baseline-surface: #fef2f2;
+        --changed-surface: #fff7ed;
+        --neutral-surface: #f8fafc;
+        --accent-green: #15803d;
+        --accent-amber: #b45309;
+        --accent-red: #991b1b;
+      }
+      .tab-intro {
+        background: linear-gradient(90deg, var(--eco-surface) 0%, var(--neutral-surface) 100%);
+        border-left: 4px solid var(--accent-green);
+        padding: 0.8rem 1.1rem; border-radius: 0 12px 12px 0;
+        font-size: 0.93rem; color: #334155; margin-bottom: 1.2rem; line-height: 1.55;
+      }
       .carbon-chart-scroll {
         overflow-x: auto; overflow-y: hidden;
-        border: 1px solid #e2e8f0; border-radius: 14px;
-        padding: 14px 12px 10px; background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-        scrollbar-width: thin; scrollbar-color: #16a34a #e2e8f0;
+        border: 1px solid #cbd5e1; border-radius: 14px;
+        padding: 14px 12px 10px;
+        background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 55%, #94a3b8 100%);
+        scrollbar-width: thin;
+        scrollbar-color: var(--carbon-dark) #cbd5e1;
       }
-      .carbon-chart-scroll::-webkit-scrollbar { height: 10px; }
+      .carbon-chart-scroll::-webkit-scrollbar { height: 12px; }
+      .carbon-chart-scroll::-webkit-scrollbar-track {
+        background: linear-gradient(90deg, var(--carbon-light), #cbd5e1);
+        border-radius: 8px;
+      }
       .carbon-chart-scroll::-webkit-scrollbar-thumb {
-        background: #16a34a; border-radius: 8px;
+        background: linear-gradient(90deg, var(--carbon-mint), var(--carbon-dark));
+        border-radius: 8px; border: 2px solid #e2e8f0;
       }
       .carbon-chart-inner {
         display: flex; align-items: flex-end; gap: 10px; padding-bottom: 4px;
@@ -116,12 +144,15 @@ st.markdown(
       }
       .carbon-bar-wrap {
         width: 100%; display: flex; align-items: flex-end; justify-content: center;
-        background: #e2e8f0; border-radius: 8px 8px 4px 4px; padding: 4px 4px 0;
+        background: linear-gradient(180deg, #f1f5f9 0%, #64748b 100%);
+        border-radius: 8px 8px 4px 4px; padding: 4px 4px 0;
+        border: 1px solid #94a3b8;
       }
       .carbon-bar-fill {
         width: 100%; min-height: 4px; border-radius: 6px 6px 2px 2px;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+        box-shadow: 0 3px 10px rgba(15, 23, 42, 0.25);
         transition: height 0.25s ease;
+        border: 1px solid rgba(0,0,0,0.08);
       }
       .carbon-bar-region {
         font-size: 0.72rem; font-weight: 700; color: #334155; margin-top: 8px;
@@ -139,22 +170,41 @@ st.markdown(
         margin-top: 3px;
       }
       .carbon-legend {
-        display: flex; gap: 1rem; margin-top: 0.65rem; flex-wrap: wrap;
-        font-size: 0.78rem; font-weight: 600; color: #475569;
+        margin-top: 0.75rem; font-size: 0.78rem; font-weight: 600; color: #475569;
       }
-      .carbon-legend span::before {
-        content: ''; display: inline-block; width: 12px; height: 12px;
-        border-radius: 3px; margin-right: 6px; vertical-align: -2px;
+      .gradient-legend-bar {
+        height: 14px; border-radius: 8px; margin: 6px 0 4px;
+        background: linear-gradient(90deg,
+          #ecfdf5 0%, #86efac 18%, #fde047 40%, #fb923c 62%, #dc2626 82%, #450a0a 100%);
+        border: 1px solid #94a3b8;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.12);
       }
-      .leg-lo::before { background: #22c55e; }
-      .leg-mid::before { background: #eab308; }
-      .leg-hi::before { background: #ef4444; }
+      .gradient-legend-labels {
+        display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b;
+      }
+      .compare-arrow {
+        font-weight: 700; color: var(--accent-green); background: var(--eco-surface);
+        padding: 2px 8px; border-radius: 6px; border: 1px solid #86efac;
+      }
+      .compare-baseline {
+        color: var(--accent-red); background: var(--baseline-surface);
+        padding: 2px 6px; border-radius: 4px; font-weight: 600;
+      }
+      .compare-eco {
+        color: var(--accent-green); background: var(--eco-surface);
+        padding: 2px 6px; border-radius: 4px; font-weight: 600;
+      }
       .compact-grid-row {
         display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
         font-size: 0.8rem;
       }
       .compact-grid-track {
-        flex: 1; height: 8px; background: #e2e8f0; border-radius: 999px; overflow: hidden;
+        flex: 1; height: 10px;
+        background: linear-gradient(90deg, #f1f5f9, #94a3b8);
+        border-radius: 999px; overflow: hidden; border: 1px solid #cbd5e1;
+      }
+      div[data-testid="stAlert"] {
+        border-radius: 10px !important;
       }
       div.stButton > button[kind="primary"] {
         background: linear-gradient(135deg, #16a34a, #15803d); border: none; color: white;
@@ -178,6 +228,47 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
 
 
+CARBON_GRADIENT_STOPS: list[tuple[float, str]] = [
+    (0.0, "#ecfdf5"),
+    (0.18, "#86efac"),
+    (0.40, "#fde047"),
+    (0.62, "#fb923c"),
+    (0.82, "#dc2626"),
+    (1.0, "#450a0a"),
+]
+
+
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    h = hex_color.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+
+def _lerp_hex(c1: str, c2: str, t: float) -> str:
+    r1, g1, b1 = _hex_to_rgb(c1)
+    r2, g2, b2 = _hex_to_rgb(c2)
+    return "#{:02x}{:02x}{:02x}".format(
+        int(r1 + (r2 - r1) * t),
+        int(g1 + (g2 - g1) * t),
+        int(b1 + (b2 - b1) * t),
+    )
+
+
+def _carbon_gradient_color(ratio: float) -> str:
+    """Smooth light → dark scale for carbon intensity (0 = greenest, 1 = dirtiest)."""
+    ratio = max(0.0, min(1.0, ratio))
+    for i in range(len(CARBON_GRADIENT_STOPS) - 1):
+        r0, c0 = CARBON_GRADIENT_STOPS[i]
+        r1, c1 = CARBON_GRADIENT_STOPS[i + 1]
+        if r0 <= ratio <= r1:
+            span = r1 - r0 or 1.0
+            return _lerp_hex(c0, c1, (ratio - r0) / span)
+    return CARBON_GRADIENT_STOPS[-1][1]
+
+
+def _tab_intro(text: str) -> None:
+    st.markdown(f'<div class="tab-intro">{text}</div>', unsafe_allow_html=True)
+
+
 def _format_locality(value: str | None) -> str:
     """Human-readable locality — None means the job can run in any region."""
     if value is None or (isinstance(value, float) and pd.isna(value)):
@@ -188,17 +279,11 @@ def _format_locality(value: str | None) -> str:
     return text
 
 
-def _intensity_color(value: int, max_val: int) -> str:
-    ratio = value / max(max_val, 1)
-    if ratio <= 0.30:
-        return "#22c55e"
-    if ratio <= 0.50:
-        return "#84cc16"
-    if ratio <= 0.68:
-        return "#eab308"
-    if ratio <= 0.82:
-        return "#f97316"
-    return "#ef4444"
+def _intensity_color(value: int, max_val: int, min_val: int | None = None) -> str:
+    lo = min_val if min_val is not None else 0
+    span = max(max_val - lo, 1)
+    ratio = (value - lo) / span
+    return _carbon_gradient_color(ratio)
 
 
 def _render_scrollable_carbon_chart(
@@ -210,12 +295,13 @@ def _render_scrollable_carbon_chart(
     """Horizontal-scroll bar chart — resize bars via sidebar controls."""
     greenest = min(grid, key=grid.get)
     max_val = max(grid.values()) or 1
+    min_val = min(grid.values()) or 0
     cols: list[str] = []
 
     for region in REGIONS:
         value = grid[region]
         h_pct = max(6, int((value / max_val) * 100))
-        color = _intensity_color(value, max_val)
+        color = _intensity_color(value, max_val, min_val)
         geo = REGION_GEO.get(region, {})
         badge = '<span class="bar-badge-green">GREENEST</span>' if region == greenest else ""
         cols.append(
@@ -237,11 +323,11 @@ def _render_scrollable_carbon_chart(
         f'<div class="carbon-chart-scroll">'
         f'<div class="carbon-chart-inner" style="min-width:{inner_w}px">{"".join(cols)}</div>'
         f"</div>"
-        f'<div class="carbon-legend">'
-        f'<span class="leg-lo">Low carbon</span>'
-        f'<span class="leg-mid">Medium</span>'
-        f'<span class="leg-hi">High carbon</span>'
-        f"</div>",
+        f'<div class="carbon-legend">Carbon intensity scale'
+        f'<div class="gradient-legend-bar"></div>'
+        f'<div class="gradient-legend-labels">'
+        f"<span>Light · low gCO₂</span><span>→</span><span>Dark · high gCO₂</span>"
+        f"</div></div>",
         unsafe_allow_html=True,
     )
 
@@ -250,12 +336,13 @@ def _render_compact_carbon_strip(grid: dict[str, int], max_rows: int = 5) -> Non
     """Minimal horizontal bars when chart panel is collapsed."""
     greenest = min(grid, key=grid.get)
     max_val = max(grid.values()) or 1
+    min_val = min(grid.values()) or 0
     sorted_regions = sorted(REGIONS, key=lambda r: grid[r])
     rows: list[str] = []
     for region in sorted_regions[:max_rows]:
         value = grid[region]
         width = int((value / max_val) * 100)
-        color = _intensity_color(value, max_val)
+        color = _intensity_color(value, max_val, min_val)
         star = " ★" if region == greenest else ""
         rows.append(
             f'<div class="compact-grid-row">'
@@ -448,33 +535,89 @@ def _build_dispatch_table(
     assignments: list[dict[str, Any]],
     grid: dict[str, int],
     greenest: str,
+    baseline_assignments: list[dict[str, Any]] | None = None,
+    tariffs: dict[str, float] | None = None,
 ) -> pd.DataFrame:
-    by_job = {a["job_id"]: a for a in assignments}
+    tariffs = tariffs or st.session_state.tariffs
+    eco_by = {a["job_id"]: a for a in assignments}
+    base_by = {a["job_id"]: a for a in (baseline_assignments or [])}
     rows: list[dict[str, Any]] = []
+
     for job in jobs:
-        a = by_job.get(job["job_id"])
-        if not a:
+        eco = eco_by.get(job["job_id"])
+        if not eco:
             continue
-        region = a["target_region"]
+        eco_region = eco["target_region"]
+        base = base_by.get(job["job_id"])
+        base_region = base["target_region"] if base else "—"
+        hours = job["compute_hours"]
+        eco_carbon = grid[eco_region] * hours
+        base_carbon = grid[base_region] * hours if base else None
+        eco_cost = round(tariffs.get(eco_region, 0.10) * hours, 2)
+        base_cost = round(tariffs.get(base_region, 0.10) * hours, 2) if base else None
+        region_changed = base and base_region != eco_region
+
         rows.append(
             {
                 "Job ID": job["job_id"],
                 "Workload": job["task"],
                 "Priority": "Urgent" if job.get("is_urgent") else "Flexible",
                 "Locality": _format_locality(job.get("locality_constraint")),
-                "Routed To": region,
-                "Hours": job["compute_hours"],
-                "Est. Carbon (gCO₂)": grid[region] * job["compute_hours"],
-                "Est. Cost ($)": round(
-                    st.session_state.tariffs.get(region, 0.10) * job["compute_hours"], 2
+                "Baseline region": base_region,
+                "EcoRouter region": eco_region,
+                "Route change": (
+                    f"{base_region} → {eco_region}" if region_changed else "Same"
                 ),
-                "Deadline (UTC)": job.get("deadline_utc", "—"),
-                "SLA": "PASS" if a.get("sla_met", True) else "FAIL",
-                "Status": _assignment_status(job, a, greenest),
-                "Reasoning": a.get("reasoning", ""),
+                "Hours": hours,
+                "Baseline carbon": base_carbon,
+                "Eco carbon": eco_carbon,
+                "Carbon Δ": (base_carbon - eco_carbon) if base_carbon is not None else None,
+                "Baseline $": base_cost,
+                "Eco $": eco_cost,
+                "Cost Δ": round(base_cost - eco_cost, 2) if base_cost is not None else None,
+                "SLA": "PASS" if eco.get("sla_met", True) else "FAIL",
+                "Status": _assignment_status(job, eco, greenest),
+                "Reasoning": eco.get("reasoning", ""),
             }
         )
     return pd.DataFrame(rows)
+
+
+def _style_assignment_overview(df: pd.DataFrame) -> Any:
+    """Color-code rows: green = improved, amber = rerouted, neutral = unchanged."""
+
+    def _row_style(row: pd.Series) -> list[str]:
+        changed = row.get("Route change", "Same") != "Same"
+        carbon_delta = row.get("Carbon Δ")
+        if changed and carbon_delta is not None and carbon_delta > 0:
+            bg = "#ecfdf5"
+            color = "#14532d"
+        elif changed:
+            bg = "#fff7ed"
+            color = "#9a3412"
+        elif carbon_delta is not None and carbon_delta > 0:
+            bg = "#f0fdf4"
+            color = "#166534"
+        else:
+            bg = "#f8fafc"
+            color = "#334155"
+        style = f"background-color: {bg}; color: {color}"
+        return [style] * len(row)
+
+    def _highlight_delta(val: Any) -> str:
+        if val is None or (isinstance(val, float) and pd.isna(val)):
+            return ""
+        if isinstance(val, (int, float)) and val > 0:
+            return "color: #15803d; font-weight: 700"
+        if isinstance(val, (int, float)) and val < 0:
+            return "color: #b91c1c; font-weight: 700"
+        return "color: #64748b"
+
+    styled = df.style.apply(_row_style, axis=1)
+    for col in ("Carbon Δ", "Cost Δ"):
+        if col in df.columns:
+            styled = styled.map(_highlight_delta, subset=[col])
+    return styled
 
 
 def _render_dispatch_cards(
@@ -482,28 +625,59 @@ def _render_dispatch_cards(
     assignments: list[dict[str, Any]],
     grid: dict[str, int],
     greenest: str,
+    baseline_assignments: list[dict[str, Any]] | None = None,
+    tariffs: dict[str, float] | None = None,
 ) -> None:
-    by_job = {a["job_id"]: a for a in assignments}
+    tariffs = tariffs or st.session_state.tariffs
+    eco_by = {a["job_id"]: a for a in assignments}
+    base_by = {a["job_id"]: a for a in (baseline_assignments or [])}
+
     for job in jobs:
-        a = by_job.get(job["job_id"])
-        if not a:
+        eco = eco_by.get(job["job_id"])
+        if not eco:
             st.warning(f"No assignment for **{job['job_id']}** ({job['task']})")
             continue
 
-        region = a["target_region"]
-        carbon = grid[region] * job["compute_hours"]
-        status = _assignment_status(job, a, greenest)
+        eco_region = eco["target_region"]
+        base = base_by.get(job["job_id"])
+        base_region = base["target_region"] if base else None
+        hours = job["compute_hours"]
+        eco_carbon = grid[eco_region] * hours
+        base_carbon = grid[base_region] * hours if base_region else None
+        status = _assignment_status(job, eco, greenest)
+        changed = base_region and base_region != eco_region
 
         with st.container(border=True):
-            h1, h2 = st.columns([3, 1])
+            h1, h2, h3 = st.columns([2.2, 1.2, 1.2])
             with h1:
                 st.markdown(f"**{job['task']}**")
-                st.caption(f"`{job['job_id']}` · {job['compute_hours']}h · "
-                          f"{'Urgent' if job.get('is_urgent') else 'Flexible'}")
+                st.caption(
+                    f"`{job['job_id']}` · {hours}h · "
+                    f"{'Urgent' if job.get('is_urgent') else 'Flexible'}"
+                )
             with h2:
-                st.metric("Carbon", f"{carbon:,} gCO₂")
+                if base_carbon is not None:
+                    st.metric("Baseline carbon", f"{base_carbon:,}", label_visibility="visible")
+                else:
+                    st.metric("Carbon", f"{eco_carbon:,}")
+            with h3:
+                delta = (base_carbon - eco_carbon) if base_carbon else None
+                st.metric(
+                    "Eco carbon",
+                    f"{eco_carbon:,}",
+                    f"−{delta:,}" if delta and delta > 0 else None,
+                )
 
-            st.markdown(f"**→ {region}**")
+            if base_region:
+                st.markdown(
+                    f'<span class="compare-baseline">{base_region}</span>'
+                    f' &nbsp;→&nbsp; <span class="compare-eco">{eco_region}</span>',
+                    unsafe_allow_html=True,
+                )
+                if changed:
+                    st.caption(f"Region changed · carbon Δ {base_carbon - eco_carbon:,} gCO₂")
+            else:
+                st.markdown(f"**→ {eco_region}**")
 
             if "Forecast deferral" in status:
                 st.info(status)
@@ -511,10 +685,12 @@ def _render_dispatch_cards(
                 st.warning(status)
             elif "Optimal" in status:
                 st.success(status)
+            elif changed:
+                st.success("✓ Re-routed vs baseline")
             else:
                 st.write(status)
 
-            st.caption(a.get("reasoning", ""))
+            st.caption(eco.get("reasoning", ""))
 
 
 _init_session()
@@ -639,6 +815,11 @@ tab_dash, tab_optimizer, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.ta
 
 # ===================== TAB 1: DASHBOARD =====================
 with tab_dash:
+    _tab_intro(
+        "Monitor live grid carbon across 20 regions, review the pending job queue, "
+        "and run optimization. After routing, the assignment overview highlights "
+        "<strong>baseline → EcoRouter</strong> changes with color-coded savings."
+    )
     cheapest = min(tariffs, key=tariffs.get)
     m1, m2, m3, m4, m5, m6 = st.columns(6)
     m1.metric("Regions", len(REGIONS))
@@ -749,10 +930,31 @@ with tab_dash:
         st.caption(f"Engine: **{st.session_state.router}**")
 
         dispatch_df = _build_dispatch_table(
-            jobs, st.session_state.assignments, grid, greenest
+            jobs,
+            st.session_state.assignments,
+            grid,
+            greenest,
+            baseline_assignments=st.session_state.baseline_assignments,
+            tariffs=tariffs,
         )
-        st.markdown("#### Assignment overview")
-        st.dataframe(dispatch_df, use_container_width=True, hide_index=True)
+        st.markdown("#### Assignment overview — baseline vs EcoRouter")
+        st.caption(
+            "🟢 Green rows = region changed with carbon savings · "
+            "🟠 Amber = rerouted · ⬜ Gray = same as baseline"
+        )
+        st.dataframe(
+            _style_assignment_overview(dispatch_df),
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Baseline carbon": st.column_config.NumberColumn(format="%d"),
+                "Eco carbon": st.column_config.NumberColumn(format="%d"),
+                "Carbon Δ": st.column_config.NumberColumn(format="%+d"),
+                "Baseline $": st.column_config.NumberColumn(format="$%.2f"),
+                "Eco $": st.column_config.NumberColumn(format="$%.2f"),
+                "Cost Δ": st.column_config.NumberColumn(format="$%+.2f"),
+            },
+        )
 
         load_df = pd.DataFrame(compute_load_distribution(st.session_state.assignments))
         active_load = load_df[load_df["jobs"] > 0].sort_values("jobs", ascending=False)
@@ -770,16 +972,24 @@ with tab_dash:
                 f"Jobs spread across **{len(active_load)}** of {len(REGIONS)} regions."
             )
 
-        with st.expander("Per-job detail cards"):
-            _render_dispatch_cards(jobs, st.session_state.assignments, grid, greenest)
+        with st.expander("Per-job detail cards (before → after)"):
+            _render_dispatch_cards(
+                jobs,
+                st.session_state.assignments,
+                grid,
+                greenest,
+                baseline_assignments=st.session_state.baseline_assignments,
+                tariffs=tariffs,
+            )
 
 # ===================== TAB 2: REGION OPTIMIZER =====================
 with tab_optimizer:
-    st.markdown("<p class='section-title'>🧭 Region Optimizer Tools</p>", unsafe_allow_html=True)
-    st.caption(
-        f"Explore all **{len(REGIONS)}** regions — ranked by composite carbon+cost score "
-        "and Pareto eligibility vs us-east-1 baseline."
+    _tab_intro(
+        "Rank all regions by carbon, cost, and Pareto eligibility. "
+        "Use the global map and what-if analyzer to preview routing decisions "
+        "before running a full batch."
     )
+    st.markdown("<p class='section-title'>🧭 Region Optimizer Tools</p>", unsafe_allow_html=True)
 
     matrix = region_score_matrix(
         grid, tariffs, carbon_weight=st.session_state.carbon_weight
@@ -842,8 +1052,12 @@ with tab_optimizer:
 
 # ===================== TAB 3: FORECAST =====================
 with tab_forecast:
+    _tab_intro(
+        "See 12-hour carbon forecasts per region and deferral recommendations. "
+        "Enable forecast-aware routing in the sidebar to shift flexible jobs "
+        "to greener time windows."
+    )
     st.markdown("<p class='section-title'>📈 12-Hour Carbon Intensity Forecast</p>", unsafe_allow_html=True)
-    st.caption("Diurnal solar/wind model with mean-reversion — enables proactive scheduling.")
 
     if st.button("🔮 Regenerate Forecast", use_container_width=False):
         _update_forecast()
@@ -884,10 +1098,13 @@ with tab_forecast:
         """
     )
 
-# ===================== TAB 3: A/B COMPARISON =====================
+# ===================== TAB 4: A/B COMPARISON =====================
 with tab_ab:
+    _tab_intro(
+        "Compare EcoRouter against a naive baseline (static us-east-1 or round-robin). "
+        "View total carbon and cost savings, tradeoff messaging, and per-job breakdowns."
+    )
     st.markdown("<p class='section-title'>⚖️ EcoRouter vs Baseline Scheduler</p>", unsafe_allow_html=True)
-    st.caption("Quantify carbon savings against naive industry-default policies.")
 
     if not st.session_state.comparison:
         st.info("Run **EcoRouter Optimization** on the Live Dashboard tab to generate comparison data.")
@@ -968,8 +1185,11 @@ with tab_ab:
 
 # ===================== TAB 4: ENTERPRISE =====================
 with tab_enterprise:
+    _tab_intro(
+        "Upload custom job queues (JSON/CSV), inspect regional tariffs across all zones, "
+        "and export ESG / Scope 2 PDF reports for compliance teams."
+    )
     st.markdown("<p class='section-title'>🏢 Enterprise — BYO Jobs, SLA & ESG Reporting</p>", unsafe_allow_html=True)
-    st.caption("Upload your workload queue, enforce SLA deadlines, and export Scope 2 reports for compliance.")
 
     up1, up2 = st.columns(2)
     with up1:
@@ -1048,6 +1268,10 @@ with tab_enterprise:
 
 # ===================== TAB 5: TOOLS & API =====================
 with tab_tools:
+    _tab_intro(
+        "Download JSON/CSV exports from your last run, review session history, "
+        "and copy REST API commands for programmatic integration."
+    )
     st.markdown("<p class='section-title'>🔧 Tools, Export & REST API</p>", unsafe_allow_html=True)
 
     col_a, col_b = st.columns(2)
