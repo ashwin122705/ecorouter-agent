@@ -331,6 +331,100 @@ def build_theme_css(theme: str) -> str:
         border-radius: 999px; overflow: hidden; border: 1px solid {t["border"]};
       }}
 
+      .load-chart-panel {{
+        margin-top: 0.5rem;
+      }}
+      .load-chart-scroll {{
+        overflow-x: auto; overflow-y: hidden;
+        border: 1px solid {t["border"]}; border-radius: 14px;
+        padding: 16px 14px 12px; background: {t["chart_scroll_bg"]};
+        scrollbar-width: thin; scrollbar-color: {t["scroll_thumb"]} {t["scroll_track"]};
+      }}
+      .load-chart-scroll::-webkit-scrollbar {{ height: 12px; }}
+      .load-chart-scroll::-webkit-scrollbar-track {{
+        background: {t["scroll_track"]}; border-radius: 8px;
+      }}
+      .load-chart-scroll::-webkit-scrollbar-thumb {{
+        background: {t["scroll_thumb"]}; border-radius: 8px;
+        border: 2px solid {t["border"]};
+      }}
+      .load-chart-plot {{
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        min-width: max(100%, calc(var(--bar-count, 4) * 52px));
+      }}
+      .load-bars-row {{
+        display: flex;
+        align-items: flex-end;
+        width: 100%;
+        gap: clamp(10px, 1.5vw, 22px);
+        min-height: 320px;
+      }}
+      .load-baseline {{
+        height: 2px;
+        width: 100%;
+        background: {t["border"]};
+        margin: 0 0 10px 0;
+        border-radius: 999px;
+      }}
+      .load-labels-row {{
+        display: flex;
+        width: 100%;
+        gap: clamp(10px, 1.5vw, 22px);
+        align-items: flex-start;
+      }}
+      .load-bar-slot, .load-label-slot {{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        flex: 1 1 0;
+        min-width: 52px;
+        width: 0;
+      }}
+      .load-bar-value-above {{
+        font-size: clamp(0.9rem, 1.1vw, 1.2rem); font-weight: 800; color: #ffffff !important;
+        margin-bottom: 6px; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+        white-space: nowrap;
+      }}
+      .load-bar-wrap {{
+        width: 100%; display: flex; align-items: flex-end; justify-content: center;
+        background: {t["bar_track"]}; border-radius: 10px 10px 4px 4px; padding: 4px 6px 0;
+        border: 1px solid {t["border"]};
+      }}
+      .load-bar-fill {{
+        width: 100%; min-height: 8px; border-radius: 8px 8px 2px 2px;
+        box-shadow: {t["bar_shadow"]}; transition: height 0.25s ease;
+        border: 1px solid rgba(0, 0, 0, 0.18);
+        position: relative;
+        display: flex;
+        justify-content: center;
+      }}
+      .load-bar-top-label {{
+        position: absolute;
+        top: 6px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: clamp(0.9rem, 1.1vw, 1.2rem);
+        font-weight: 800;
+        color: #ffffff !important;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+        white-space: nowrap;
+        line-height: 1;
+      }}
+      .load-bar-region {{
+        font-size: 0.78rem; font-weight: 700; color: {t["text"]} !important;
+        text-align: center; line-height: 1.2; word-break: break-all;
+      }}
+      .load-bar-share {{
+        font-size: 0.72rem; font-weight: 700; color: {t["eco_text"]} !important;
+        text-align: center; margin-top: 3px;
+      }}
+      .load-bar-geo {{
+        font-size: 0.65rem; color: {t["text_muted"]} !important;
+        text-align: center; margin-top: 2px;
+      }}
+
       div[data-testid="stMetric"] {{
         background: {t["surface"]}; border: 1px solid {t["border"]}; border-radius: 12px;
         padding: 0.65rem 0.85rem; box-shadow: {t["card_shadow"]};

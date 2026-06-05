@@ -333,6 +333,81 @@ def _render_compact_carbon_strip(grid: dict[str, int], max_rows: int = 5) -> Non
     )
 
 
+def _load_bar_color(jobs: int, max_jobs: int) -> str:
+    """Green gradient — darker = more jobs in this batch."""
+    if max_jobs <= 0:
+        return "#22c55e"
+    ratio = jobs / max_jobs
+    stops = [(0.35, "#4ade80"), (0.65, "#22c55e"), (1.0, "#15803d")]
+    for threshold, color in stops:
+        if ratio <= threshold:
+            return color
+    return "#15803d"
+
+
+def _render_load_distribution_chart(
+    load_rows: pd.DataFrame | list[dict[str, Any]],
+    *,
+    chart_height: int = 300,
+) -> None:
+    """Tall vertical bars with white job-count labels; width scales with viewport."""
+    if isinstance(load_rows, pd.DataFrame):
+        rows = load_rows.sort_values("jobs", ascending=False).to_dict("records")
+    else:
+        rows = sorted(load_rows, key=lambda r: r["jobs"], reverse=True)
+    rows = [r for r in rows if int(r["jobs"]) > 0]
+    if not rows:
+        return
+
+    max_jobs = max(int(r["jobs"]) for r in rows) or 1
+    bar_slots: list[str] = []
+    label_slots: list[str] = []
+
+    for row in rows:
+        region = str(row["region"])
+        jobs = int(row["jobs"])
+        share = float(row.get("share_pct", 0))
+        h_pct = max(16, int((jobs / max_jobs) * 100))
+        fill_px = int(chart_height * h_pct / 100)
+        color = _load_bar_color(jobs, max_jobs)
+        geo = REGION_GEO.get(region, {})
+
+        if fill_px >= 36:
+            label_html = f'<span class="load-bar-top-label">{jobs}</span>'
+            above_html = ""
+        else:
+            label_html = ""
+            above_html = f'<div class="load-bar-value-above">{jobs}</div>'
+
+        bar_slots.append(
+            f'<div class="load-bar-slot">'
+            f"{above_html}"
+            f'<div class="load-bar-wrap" style="height:{chart_height}px">'
+            f'<div class="load-bar-fill" style="height:{h_pct}%;background:{color}">'
+            f"{label_html}"
+            f"</div></div></div>"
+        )
+        label_slots.append(
+            f'<div class="load-label-slot">'
+            f'<div class="load-bar-region">{region}</div>'
+            f'<div class="load-bar-share">{share:.0f}% of batch</div>'
+            f'<div class="load-bar-geo">{geo.get("label", "")}</div>'
+            f"</div>"
+        )
+
+    bar_count = len(rows)
+    st.markdown(
+        f'<div class="load-chart-panel">'
+        f'<div class="load-chart-scroll">'
+        f'<div class="load-chart-plot" style="--bar-count:{bar_count}">'
+        f'<div class="load-bars-row">{"".join(bar_slots)}</div>'
+        f'<div class="load-baseline"></div>'
+        f'<div class="load-labels-row">{"".join(label_slots)}</div>'
+        f"</div></div></div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _load_grid(source: str | None = None, fluctuate: bool = False) -> dict[str, Any]:
     src = source or st.session_state.get("grid_source", "simulated")
     if fluctuate and st.session_state.get("grid_status"):
@@ -1051,9 +1126,10 @@ with tab_dash:
                 use_container_width=True,
                 hide_index=True,
             )
-            st.bar_chart(active_load.set_index("region")["jobs"], height=320)
+            _render_load_distribution_chart(active_load, chart_height=300)
             st.caption(
-                f"Jobs spread across **{len(active_load)}** of {len(REGIONS)} regions."
+                f"Jobs spread across **{len(active_load)}** of {len(REGIONS)} regions. "
+                "White numbers show job count at the top of each bar."
             )
 
         with st.expander("Per-job detail cards (before → after)"):
