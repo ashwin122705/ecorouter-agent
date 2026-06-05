@@ -13,6 +13,20 @@ import pandas as pd
 
 from sim_environment.grid_data import REGIONS
 
+BATCH_LOCALITY_MODES = (
+    "scenario_mix",
+    "any_region",
+    "home_region",
+    "specific_region",
+)
+
+BATCH_LOCALITY_LABELS: dict[str, str] = {
+    "scenario_mix": "Realistic scenario mix",
+    "any_region": "Any region (carbon-flexible)",
+    "home_region": "Lock to my home region",
+    "specific_region": "Lock to specific region",
+}
+
 # Realistic enterprise AI workload scenarios (compliance-driven locality when set)
 JOB_SCENARIOS: list[dict[str, Any]] = [
     {
@@ -152,6 +166,27 @@ def generate_mock_jobs(num_jobs: int = 5) -> list[dict[str, Any]]:
                 index=i,
             )
         )
+    return jobs
+
+
+def build_job_batch(
+    num_jobs: int,
+    *,
+    locality_mode: str = "scenario_mix",
+    home_region: str | None = None,
+    lock_region: str | None = None,
+) -> list[dict[str, Any]]:
+    """Build a mock batch and apply sidebar locality personalization."""
+    jobs = generate_mock_jobs(num_jobs)
+    if locality_mode == "any_region":
+        for job in jobs:
+            job["locality_constraint"] = None
+    elif locality_mode == "home_region" and home_region in REGIONS:
+        for job in jobs:
+            job["locality_constraint"] = home_region
+    elif locality_mode == "specific_region" and lock_region in REGIONS:
+        for job in jobs:
+            job["locality_constraint"] = lock_region
     return jobs
 
 

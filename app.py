@@ -52,7 +52,9 @@ from sim_environment.grid_forecast import (  # noqa: E402
     recommend_deferral_window,
 )
 from sim_environment.job_queue import (  # noqa: E402
-    generate_mock_jobs,
+    BATCH_LOCALITY_LABELS,
+    BATCH_LOCALITY_MODES,
+    build_job_batch,
     parse_jobs_from_csv,
     parse_jobs_from_json,
     sample_jobs_json,
@@ -118,6 +120,9 @@ def _render_hero(
     grid: dict[str, int],
     greenest: str,
     comparison: dict[str, Any] | None = None,
+    user_name: str = "",
+    user_home_region: str | None = None,
+    locality_mode: str = "scenario_mix",
 ) -> None:
     """Top title block with live impact stats."""
     baseline_region = "us-east-1"
@@ -145,16 +150,35 @@ def _render_hero(
             f"({greenest_intensity:,} gCO₂/kWh)"
         )
 
+    name = user_name.strip()
+    title = f"🌱 EcoRouter — {name}" if name else "🌱 EcoRouter Agent"
+    eyebrow = "Stanford CS 153 · Carbon-aware orchestration"
+    if name and user_home_region:
+        eyebrow = f"{eyebrow} · {_region_label(user_home_region)} workspace"
+    if name or locality_mode != "scenario_mix":
+        if locality_mode == "home_region" and user_home_region:
+            personal_lead = (
+                f"Your batch locks workloads to {_region_label(user_home_region)}."
+            )
+        elif locality_mode == "any_region":
+            personal_lead = "Your batch is carbon-flexible across all regions."
+        elif locality_mode == "specific_region":
+            personal_lead = "Your batch locks every job to the region you selected."
+        else:
+            personal_lead = "Your batch uses realistic enterprise workload scenarios."
+    else:
+        personal_lead = ""
+
     st.markdown(
         f'<div class="ecorouter-hero">'
         f'<div class="hero-top">'
         f'<div class="hero-brand">'
-        f'<div class="hero-eyebrow">Stanford CS 153 · Carbon-aware orchestration</div>'
-        f"<h1>🌱 EcoRouter Agent</h1>"
-        f'<p class="hero-lead">Autonomous workload routing across {region_count} global regions. '
+        f'<div class="hero-eyebrow">{eyebrow}</div>'
+        f"<h1>{title}</h1>"
+        f'<p class="hero-lead">Autonomous workload routing across {region_count} AWS regions. '
         f"EcoRouter reads live grid carbon and cost telemetry, then dispatches AI jobs to "
-        f"greener regions while respecting SLA deadlines and rare compliance locks. "
-        f"{impact_sub}.</p>"
+        f"greener regions while respecting SLA deadlines and your region preferences. "
+        f"{personal_lead} {impact_sub}.</p>"
         f"</div>"
         f'<div class="hero-impact">'
         f'<div class="hero-stat"><span class="hero-stat-num">{region_count}</span>'
@@ -329,7 +353,7 @@ def _init_session() -> None:
         "grid_status": telemetry["carbon_gco2_per_kwh"],
         "tariffs": telemetry["cost_usd_per_kwh"],
         "grid_source": "simulated",
-        "jobs": generate_mock_jobs(num_jobs=6),
+        "jobs": [],
         "assignments": None,
         "baseline_assignments": None,
         "comparison": None,
@@ -349,11 +373,60 @@ def _init_session() -> None:
         "grid_chart_expanded": True,
         "carbon_bar_width": 56,
         "carbon_chart_height": 180,
+        "user_display_name": "",
+        "user_home_region": "us-east-1",
+        "batch_locality_mode": "scenario_mix",
+        "batch_lock_region": "us-east-1",
+        "_job_queue_sig": None,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
             st.session_state[key] = val
     st.session_state.theme = THEME
+    if st.session_state.user_home_region not in REGIONS:
+        st.session_state.user_home_region = REGIONS[0]
+    if st.session_state.batch_lock_region not in REGIONS:
+        st.session_state.batch_lock_region = REGIONS[0]
+    if st.session_state.batch_locality_mode not in BATCH_LOCALITY_MODES:
+        st.session_state.batch_locality_mode = "scenario_mix"
+    if not st.session_state.jobs:
+        st.session_state.jobs = build_job_batch(
+            st.session_state.num_jobs,
+            locality_mode=st.session_state.batch_locality_mode,
+            home_region=st.session_state.user_home_region,
+            lock_region=st.session_state.batch_lock_region,
+        )
+        st.session_state._job_queue_sig = (
+            st.session_state.num_jobs,
+            st.session_state.batch_locality_mode,
+            st.session_state.user_home_region,
+            st.session_state.batch_lock_region,
+        )
+
+
+def _job_queue_signature() -> tuple[Any, ...]:
+    return (
+        st.session_state.num_jobs,
+        st.session_state.batch_locality_mode,
+        st.session_state.user_home_region,
+        st.session_state.batch_lock_region,
+    )
+
+
+def _rebuild_job_queue(clear_optimization: bool = True) -> None:
+    st.session_state.jobs = build_job_batch(
+        st.session_state.num_jobs,
+        locality_mode=st.session_state.batch_locality_mode,
+        home_region=st.session_state.user_home_region,
+        lock_region=st.session_state.batch_lock_region,
+    )
+    st.session_state.custom_jobs_loaded = False
+    st.session_state._job_queue_sig = _job_queue_signature()
+    if clear_optimization:
+        st.session_state.assignments = None
+        st.session_state.baseline_assignments = None
+        st.session_state.comparison = None
+        st.session_state.optimized = False
 
 
 def _refresh_telemetry(fluctuate: bool = False, reload_jobs: bool = True) -> None:
@@ -362,7 +435,7 @@ def _refresh_telemetry(fluctuate: bool = False, reload_jobs: bool = True) -> Non
     st.session_state.grid_status = telemetry["carbon_gco2_per_kwh"]
     st.session_state.tariffs = telemetry["cost_usd_per_kwh"]
     if reload_jobs and not st.session_state.custom_jobs_loaded:
-        st.session_state.jobs = generate_mock_jobs(num_jobs=st.session_state.num_jobs)
+        _rebuild_job_queue(clear_optimization=True)
     st.session_state.assignments = None
     st.session_state.baseline_assignments = None
     st.session_state.comparison = None
@@ -641,14 +714,62 @@ if st.session_state.forecast is None:
 # --- Sidebar ---
 with st.sidebar:
     st.markdown(build_theme_css(THEME), unsafe_allow_html=True)
+    st.markdown("### 👤 Your workspace")
+    st.session_state.user_display_name = st.text_input(
+        "Your name",
+        value=st.session_state.user_display_name,
+        placeholder="e.g. Alex Chen",
+        help="Personalizes the dashboard header and summaries",
+    )
+    st.session_state.user_home_region = st.selectbox(
+        "Your home region",
+        REGIONS,
+        index=REGIONS.index(st.session_state.user_home_region),
+        format_func=_region_label,
+        help="Used when job region policy is set to your home region",
+    )
+    st.session_state.batch_locality_mode = st.radio(
+        "Job region policy",
+        BATCH_LOCALITY_MODES,
+        index=BATCH_LOCALITY_MODES.index(st.session_state.batch_locality_mode),
+        format_func=lambda m: BATCH_LOCALITY_LABELS.get(m, m),
+        help="Controls whether queued jobs are region-locked or carbon-flexible",
+    )
+    if st.session_state.batch_locality_mode == "specific_region":
+        st.session_state.batch_lock_region = st.selectbox(
+            "Lock all jobs to",
+            REGIONS,
+            index=REGIONS.index(st.session_state.batch_lock_region),
+            format_func=_region_label,
+        )
+    st.markdown("---")
     st.markdown("### ⚙️ Controls")
     cap = min(40, MAX_BATCH_JOBS)
     if st.session_state.num_jobs > cap:
         st.session_state.num_jobs = cap
-    st.session_state.num_jobs = st.slider(
-        "Jobs per batch", 2, cap, st.session_state.num_jobs,
-        help=f"Simulate up to {cap} workloads per optimization run",
-    )
+    job_col_slider, job_col_num = st.columns([4, 1])
+    with job_col_num:
+        num_jobs_val = st.number_input(
+            "Jobs #",
+            min_value=2,
+            max_value=cap,
+            value=int(st.session_state.num_jobs),
+            step=1,
+            help=f"Type a batch size (2–{cap})",
+        )
+    with job_col_slider:
+        num_jobs_val = st.slider(
+            "Jobs per batch",
+            2,
+            cap,
+            int(num_jobs_val),
+            help=f"Slide or type up to {cap} workloads per optimization run",
+        )
+    st.session_state.num_jobs = int(num_jobs_val)
+    queue_sig = _job_queue_signature()
+    if queue_sig != st.session_state.get("_job_queue_sig"):
+        _rebuild_job_queue(clear_optimization=True)
+        st.rerun()
     if st.session_state.routing_mode not in ROUTING_MODES:
         st.session_state.routing_mode = "pareto"
     st.session_state.routing_mode = st.selectbox(
@@ -731,7 +852,15 @@ tariffs = st.session_state.tariffs
 jobs = st.session_state.jobs
 greenest = min(grid, key=grid.get)
 
-_render_hero(len(REGIONS), grid, greenest, st.session_state.comparison)
+_render_hero(
+    len(REGIONS),
+    grid,
+    greenest,
+    st.session_state.comparison,
+    user_name=st.session_state.user_display_name,
+    user_home_region=st.session_state.user_home_region,
+    locality_mode=st.session_state.batch_locality_mode,
+)
 
 tab_dash, tab_optimizer, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.tabs(
     [
@@ -746,11 +875,19 @@ tab_dash, tab_optimizer, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.ta
 
 # ===================== TAB 1: DASHBOARD =====================
 with tab_dash:
+    user = st.session_state.user_display_name.strip()
+    greet = f"{user}, m" if user else "M"
+    policy = BATCH_LOCALITY_LABELS.get(st.session_state.batch_locality_mode, "")
     _tab_intro(
-        f"Monitor live grid carbon across {len(REGIONS)} AWS regions, review realistic enterprise "
-        "workloads, and run optimization. Flexible jobs spread across multiple green regions — "
-        "not a single datacenter hotspot. After routing, the assignment overview highlights "
-        "<strong>baseline → EcoRouter</strong> changes with color-coded savings."
+        f"{greet}onitor live grid carbon across {len(REGIONS)} AWS regions. "
+        f"Queue policy: <strong>{policy}</strong>"
+        + (
+            f" (home: {_region_label(st.session_state.user_home_region)})."
+            if st.session_state.batch_locality_mode == "home_region"
+            else "."
+        )
+        + " Run optimization to see jobs spread across green regions where flexible. "
+        "The assignment overview highlights <strong>baseline → EcoRouter</strong> with color-coded savings."
     )
     cheapest = min(tariffs, key=tariffs.get)
     _render_stat_cards([
