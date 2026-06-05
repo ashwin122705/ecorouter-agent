@@ -129,8 +129,8 @@ def _render_hero(
     )
 
     if comparison and comparison.get("carbon_saved_gco2", 0) > 0:
-        impact_value = f"{comparison['carbon_saved_gco2']:,}"
-        impact_label = f"gCO₂ saved ({comparison['savings_pct']}%)"
+        impact_value = f"{comparison['carbon_saved_gco2']:,} gCO₂"
+        impact_label = f"{comparison['savings_pct']}% vs baseline"
         impact_class = "hero-stat-highlight"
         impact_sub = (
             f"EcoRouter beat {comparison.get('baseline_name', 'baseline')} "
@@ -164,7 +164,7 @@ def _render_hero(
         f'<div class="hero-stat {impact_class}"><span class="hero-stat-num">{impact_value}</span>'
         f'<span class="hero-stat-lbl">{impact_label}</span></div>'
         f'<div class="hero-stat"><span class="hero-stat-num">{baseline_region}</span>'
-        f'<span class="hero-stat-lbl">{baseline_intensity:,} gCO₂ baseline</span></div>'
+        f'<span class="hero-stat-lbl">{baseline_intensity:,} gCO₂/kWh</span></div>'
         f"</div></div>"
         f'<div class="hero-pills">'
         f'<span class="ecorouter-pill">LLM Tool Calling</span>'
@@ -206,7 +206,13 @@ def _format_locality(value: str | None) -> str:
     text = str(value).strip()
     if text.lower() in {"", "—", "-", "none", "null", "nan"}:
         return "Any region"
-    return text
+    label = REGION_GEO.get(text, {}).get("label", "")
+    return f"{text} ({label})" if label else text
+
+
+def _region_label(region: str) -> str:
+    label = REGION_GEO.get(region, {}).get("label", "")
+    return f"{region} ({label})" if label else region
 
 
 def _intensity_color(value: int, max_val: int, min_val: int | None = None) -> str:
@@ -741,15 +747,15 @@ tab_dash, tab_optimizer, tab_forecast, tab_ab, tab_enterprise, tab_tools = st.ta
 # ===================== TAB 1: DASHBOARD =====================
 with tab_dash:
     _tab_intro(
-        f"Monitor live grid carbon across {len(REGIONS)} regions, review the pending job queue, "
-        "and run optimization. Most jobs are <strong>region-flexible</strong> so EcoRouter can "
-        "re-route away from the static us-east-1 baseline. After routing, the assignment overview "
-        "highlights <strong>baseline → EcoRouter</strong> changes with color-coded savings."
+        f"Monitor live grid carbon across {len(REGIONS)} AWS regions, review realistic enterprise "
+        "workloads, and run optimization. Flexible jobs spread across multiple green regions — "
+        "not a single datacenter hotspot. After routing, the assignment overview highlights "
+        "<strong>baseline → EcoRouter</strong> changes with color-coded savings."
     )
     cheapest = min(tariffs, key=tariffs.get)
     _render_stat_cards([
         ("🌍", "Regions", str(len(REGIONS)), None, "blue"),
-        ("🌿", "Greenest", f"{greenest}", f"{grid[greenest]:,} gCO₂/kWh", "green"),
+        ("🌿", "Greenest Region", _region_label(greenest), f"{grid[greenest]:,} gCO₂/kWh", "green"),
         ("💰", "Cheapest", cheapest, f"${tariffs[cheapest]:.3f}/kWh", "amber"),
         ("📋", "Pending Jobs", str(len(jobs)), None, "purple"),
         ("🧭", "Routing", ROUTING_MODE_LABELS.get(st.session_state.routing_mode, "—"), None, "slate"),
@@ -834,15 +840,15 @@ with tab_dash:
         )
         summary_cards: list[tuple[str, str, str, str | None, str]] = [
             ("✅", "Jobs Routed", str(len(st.session_state.assignments)), None, "green"),
-            ("🌱", "EcoRouter Carbon", f"{eco_total:,}", "gCO₂ total", "green"),
-            ("💵", "EcoRouter Cost", f"${eco_cost_total:.2f}", "energy spend", "amber"),
+            ("🌱", "EcoRouter Carbon", f"{eco_total:,} gCO₂", None, "green"),
+            ("💵", "EcoRouter Cost", f"${eco_cost_total:.2f}", "USD energy spend", "amber"),
         ]
         if comp:
             summary_cards.extend([
                 (
                     "📉",
                     "Carbon Saved",
-                    f"{comp['carbon_saved_gco2']:,}",
+                    f"{comp['carbon_saved_gco2']:,} gCO₂",
                     f"{comp['savings_pct']}% vs baseline",
                     "green",
                 ),
@@ -855,6 +861,11 @@ with tab_dash:
                 ),
             ])
         _render_stat_cards(summary_cards)
+        routed_regions = {a["target_region"] for a in st.session_state.assignments}
+        st.caption(
+            f"Routed across **{len(routed_regions)}** region(s): "
+            + ", ".join(_region_label(r) for r in sorted(routed_regions))
+        )
         if comp:
             tradeoff = comp.get("tradeoff_type", "")
             if tradeoff == "win_win":
@@ -1048,13 +1059,13 @@ with tab_ab:
     else:
         comp = st.session_state.comparison
         _render_stat_cards([
-            ("🌱", "EcoRouter Carbon", f"{comp['eco_total_gco2']:,}", "gCO₂", "green"),
-            ("🏭", "Baseline Carbon", f"{comp['baseline_total_gco2']:,}", "gCO₂", "red"),
+            ("🌱", "EcoRouter Carbon", f"{comp['eco_total_gco2']:,} gCO₂", None, "green"),
+            ("🏭", "Baseline Carbon", f"{comp['baseline_total_gco2']:,} gCO₂", None, "red"),
             (
                 "📉",
                 "Carbon Saved",
-                f"{comp['carbon_saved_gco2']:,}",
-                f"{comp['savings_pct']}%",
+                f"{comp['carbon_saved_gco2']:,} gCO₂",
+                f"{comp['savings_pct']}% vs baseline",
                 "green",
             ),
             (

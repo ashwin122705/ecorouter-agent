@@ -77,17 +77,16 @@ def select_cost_aware_region(
     return best, reasoning
 
 
-def select_pareto_region(
+def pareto_candidate_pool(
     candidates: list[str],
     grid_status: dict[str, int],
     tariffs: dict[str, float],
     reference_region: str = DEFAULT_BASELINE_REGION,
-) -> tuple[str, str, str]:
+) -> tuple[list[str], str]:
     """
-    Prefer regions that beat the baseline on carbon without increasing cost.
+    Return eligible regions and tier for Pareto routing.
 
-    Returns (region, reasoning, tier) where tier is:
-      strict_pareto | cost_neutral_carbon | cost_aware_fallback
+    tier: strict_pareto | cost_neutral_carbon | cost_aware_fallback
     """
     ref_carbon = grid_status[reference_region]
     ref_tariff = tariffs.get(reference_region, REGION_TARIFFS_USD[reference_region])
@@ -97,35 +96,88 @@ def select_pareto_region(
         if grid_status[r] < ref_carbon and tariffs.get(r, 1) <= ref_tariff
     ]
     if strict:
-        best = min(strict, key=lambda r: grid_status[r])
-        return (
-            best,
-            (
-                f"Pareto-optimal vs {reference_region}: {best} lowers carbon "
-                f"({grid_status[best]} vs {ref_carbon} gCO₂/kWh) "
-                f"without raising tariff (${tariffs.get(best, 0):.3f} vs ${ref_tariff:.3f}/kWh)."
-            ),
-            "strict_pareto",
-        )
+        return strict, "strict_pareto"
 
     cost_neutral = [r for r in candidates if tariffs.get(r, 1) <= ref_tariff]
     greener = [r for r in cost_neutral if grid_status[r] < ref_carbon]
     if greener:
-        best = min(greener, key=lambda r: grid_status[r])
-        return (
-            best,
-            (
-                f"Cost-neutral carbon win vs {reference_region}: {best} "
-                f"({grid_status[best]} gCO₂/kWh) at same-or-lower tariff."
+        return greener, "cost_neutral_carbon"
+
+    return list(candidates), "cost_aware_fallback"
+
+
+def select_pareto_region(
+    candidates: list[str],
+    grid_status: dict[str, int],
+    tariffs: dict[str, float],
+    reference_region: str = DEFAULT_BASELINE_REGION,
+    region_load: dict[str, int] | None = None,
+    max_load: int = 1,
+    load_penalty: float = 0.38,
+) -> tuple[str, str, str]:
+    """
+    Prefer regions that beat the baseline on carbon without increasing cost.
+    When several regions qualify, spread jobs using a light load penalty
+    instead of sending every job to a single greenest datacenter.
+    """
+    pool, tier = pareto_candidate_pool(
+        candidates, grid_status, tariffs, reference_region
+    )
+    ref_carbon = grid_status[reference_region]
+    ref_tariff = tariffs.get(reference_region, REGION_TARIFFS_USD[reference_region])
+    loads = region_load or {}
+
+    if tier == "cost_aware_fallback":
+        best, reasoning = select_cost_aware_region(
+            candidates, grid_status, tariffs, carbon_weight=0.55
+        )
+        if loads:
+            best = min(
+                pool,
+                key=lambda r: composite_score(
+                    r,
+                    pool,
+                    grid_status,
+                    tariffs,
+                    carbon_weight=0.55,
+                    load_fraction=loads.get(r, 0) / max(max_load, 1),
+                    load_penalty=load_penalty,
+                ),
+            )
+            reasoning = (
+                f"No strict Pareto option vs {reference_region}; load-balanced pick "
+                f"{best} ({grid_status[best]} gCO₂/kWh, ${tariffs.get(best, 0):.3f}/kWh)."
+            )
+        return best, reasoning, tier
+
+    if len(pool) == 1 or not loads:
+        best = min(pool, key=lambda r: grid_status[r])
+    else:
+        best = min(
+            pool,
+            key=lambda r: composite_score(
+                r,
+                pool,
+                grid_status,
+                tariffs,
+                carbon_weight=0.72,
+                load_fraction=loads.get(r, 0) / max(max_load, 1),
+                load_penalty=load_penalty,
             ),
-            "cost_neutral_carbon",
         )
 
-    best, reasoning = select_cost_aware_region(
-        candidates, grid_status, tariffs, carbon_weight=0.55
-    )
-    return (
-        best,
-        f"No strict Pareto option vs {reference_region}; {reasoning}",
-        "cost_aware_fallback",
-    )
+    if tier == "strict_pareto":
+        reasoning = (
+            f"Pareto-optimal vs {reference_region}: {best} "
+            f"({grid_status[best]} vs {ref_carbon} gCO₂/kWh, "
+            f"${tariffs.get(best, 0):.3f} vs ${ref_tariff:.3f}/kWh)."
+        )
+        if len(pool) > 1 and loads.get(best, 0) > 0:
+            reasoning += f" Spread across {len(pool)} qualifying regions."
+    else:
+        reasoning = (
+            f"Cost-neutral carbon win vs {reference_region}: {best} "
+            f"({grid_status[best]} gCO₂/kWh) at same-or-lower tariff."
+        )
+
+    return best, reasoning, tier

@@ -408,9 +408,12 @@ def run_pareto_router(
     Falls back to cost-aware when no Pareto-optimal option exists.
     """
     tariffs = tariffs or REGION_TARIFFS_USD
+    region_load: dict[str, int] = {r: 0 for r in REGIONS}
     assignments: list[dict[str, Any]] = []
+    sorted_jobs = sorted(jobs, key=lambda j: j.get("compute_hours", 0), reverse=True)
+    max_load = max(sum(j.get("compute_hours", 1) for j in jobs), 1)
 
-    for job in jobs:
+    for job in sorted_jobs:
         candidates = allowed_regions(job)
         ref = baseline_reference_region(job, baseline_region)
 
@@ -420,9 +423,16 @@ def run_pareto_router(
             tier = "locality_locked"
         else:
             target, reasoning, tier = select_pareto_region(
-                candidates, grid_status, tariffs, reference_region=ref
+                candidates,
+                grid_status,
+                tariffs,
+                reference_region=ref,
+                region_load=region_load,
+                max_load=max_load,
+                load_penalty=0.38,
             )
 
+        region_load[target] = region_load.get(target, 0) + job.get("compute_hours", 1)
         assignments.append(
             {
                 "job_id": job["job_id"],
